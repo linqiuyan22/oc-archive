@@ -517,14 +517,34 @@ function setupAudio() {
     const audio = document.getElementById('bgAudio');
     if (DEFAULT_AUDIO_SRC) {
         document.getElementById('audioSource').src = DEFAULT_AUDIO_SRC;
-        audio.load(); audio.volume = 0.3; audio.play().catch(()=>{});
-        document.getElementById('audioIndicator').textContent = '🔊';
+        audio.load();
+        audio.volume = 0.3;
+        // 尝试自动播放（如果被拦截，用户点击按钮时也能播）
+        audio.muted = true; // 先静音
+        audio.play().then(() => {
+            audio.muted = false; // 播放成功后再取消静音
+            document.getElementById('audioIndicator').textContent = '🔊';
+        }).catch(() => {
+            audio.muted = false;
+        });
     }
     document.getElementById('audioToggleBtn').addEventListener('click', ()=>{
-        if(audio.paused){ audio.play(); document.getElementById('audioToggleBtn').textContent='暂停'; }
-        else { audio.pause(); document.getElementById('audioToggleBtn').textContent='播放'; }
+        if(audio.paused){
+            audio.muted = false;
+            audio.play().then(() => {
+                document.getElementById('audioToggleBtn').textContent='暂停';
+                document.getElementById('audioIndicator').textContent='🔊';
+            }).catch(err => console.log('播放失败', err));
+        } else {
+            audio.pause();
+            document.getElementById('audioToggleBtn').textContent='播放';
+            document.getElementById('audioIndicator').textContent='🔇';
+        }
     });
-    document.getElementById('volumeSlider').addEventListener('input', e => audio.volume = e.target.value/100);
+    document.getElementById('volumeSlider').addEventListener('input', e => {
+        audio.volume = e.target.value/100;
+        audio.muted = false;
+    });
 }
 function startRain() {
     const canvas = document.getElementById('rainCanvas');
