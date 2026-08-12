@@ -577,4 +577,294 @@ try {
     renderPostList();
 } catch(e) {
     console.error('论坛渲染失败:', e);
+}m => {
+        const card = document.createElement('div');
+        card.className = 'archive-card';
+        card.innerHTML = `
+            <div class="card-header"><span class="card-id">${item.id}</span><span class="card-category">${item.category}</span></div>
+            <div class="card-title">${item.title}</div>
+            <div class="card-summary">${item.summary}</div>
+            <div class="card-actions"><button class="fav-btn" data-id="${item.id}">⭐ 收藏</button><button class="view-detail-btn">📄 查看详情</button></div>`;
+        card.querySelector('.view-detail-btn').addEventListener('click', e => { e.stopPropagation(); openArchiveDetail(item); });
+        card.addEventListener('click', () => openArchiveDetail(item));
+        card.querySelector('.fav-btn').addEventListener('click', e => { e.stopPropagation(); toggleFavorite(item.id); renderArchiveList(); });
+        list.appendChild(card);
+    });
+}
+function openArchiveDetail(item) {
+    addHistory(item.id);
+    const modal = document.getElementById('archiveDetailModal');
+    const content = document.getElementById('archiveDetailContent');
+    content.innerHTML = `
+        <div class="archive-detail-header"><h2>${item.title}</h2><span class="archive-detail-category">${item.category}</span></div>
+        <div class="archive-detail-body">${item.content}</div>`;
+    modal.style.display = 'flex';
+}
+document.getElementById('closeArchiveDetailBtn').addEventListener('click', () => {
+    document.getElementById('archiveDetailModal').style.display = 'none';
+});
+document.getElementById('archiveDetailModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+});
+function addHistory(id) {
+    if (!currentUser) return;
+    const uid = currentUser.id;
+    userHistory[uid] = [id, ...userHistory[uid].filter(x => x !== id)].slice(0, 20);
+    safeSet('xuju_history', userHistory);
+}
+function toggleFavorite(id) {
+    if (!currentUser) return;
+    const uid = currentUser.id;
+    if (!userFavorites[uid]) userFavorites[uid] = [];
+    const idx = userFavorites[uid].indexOf(id);
+    idx > -1 ? userFavorites[uid].splice(idx, 1) : userFavorites[uid].push(id);
+    safeSet('xuju_favs', userFavorites);
+}
+
+// 灵犀通讯
+function renderLingshi() {
+    const msgs = lingshiMessages[currentChannel] || [];
+    const container = document.getElementById('lingshiMessages');
+    if (container) container.innerHTML = msgs.map(m => `<div class="lingshi-msg"><div class="lingshi-msg-user">${m.user} · ${m.time}</div><div class="lingshi-msg-text">${m.text}</div></div>`).join('');
+    const nameEl = document.getElementById('currentChannelName');
+    if (nameEl) nameEl.textContent = '#' + (currentChannel === 'main' ? '总局频道' : currentChannel === 'club' ? '民俗社五人' : currentChannel === 'operation' ? '外勤行动' : '档案室');
+    document.querySelectorAll('.channel-btn').forEach(b => b.classList.toggle('active', b.dataset.channel === currentChannel));
+}
+document.querySelectorAll('.channel-btn').forEach(btn => btn.addEventListener('click', () => { currentChannel = btn.dataset.channel; renderLingshi(); }));
+document.getElementById('lingshiSendBtn').addEventListener('click', () => {
+    const input = document.getElementById('lingshiInput');
+    const text = input.value.trim();
+    if (!text || !currentUser) return;
+    if (!lingshiMessages[currentChannel]) lingshiMessages[currentChannel] = [];
+    lingshiMessages[currentChannel].push({ user: currentUser.name, text, time: new Date().toLocaleString('zh-CN') });
+    safeSet('xuju_lingshi', lingshiMessages);
+    renderLingshi();
+    input.value = '';
+});
+document.getElementById('lingshiInput').addEventListener('keypress', e => { if(e.key==='Enter') document.getElementById('lingshiSendBtn').click(); });
+
+// 司内议室
+function renderInternalPosts() {
+    const list = document.getElementById('internalPostList');
+    list.innerHTML = internalPosts.slice().reverse().map(p => `
+        <div class="internal-post-item" data-id="${p.id}">
+            <div class="internal-post-title">${p.title}</div>
+            <div class="internal-post-meta">${p.author} · ${p.timestamp} · ${(p.comments||[]).length}回复</div>
+        </div>`).join('');
+    document.querySelectorAll('.internal-post-item').forEach(el => el.addEventListener('click', () => showInternalPostDetail(el.dataset.id)));
+}
+function showInternalPostDetail(id) {
+    const post = internalPosts.find(p => p.id === id);
+    if (!post) return;
+    document.getElementById('internalPostList').style.display = 'none';
+    const detail = document.getElementById('internalPostDetail');
+    detail.style.display = 'block';
+    detail.dataset.currentId = id;
+    document.getElementById('internalPostContent').innerHTML = `
+        <h3 style="color:#ddd;">${post.title}</h3>
+        <div style="color:#777;font-size:0.8rem;margin:10px 0;">${post.author} · ${post.timestamp}</div>
+        <div style="color:#ccc;line-height:1.7;white-space:pre-wrap;">${post.content}</div>
+        <hr style="border-color:#333;margin:20px 0;">
+        <h4 style="color:#aaa;">回复</h4>
+        ${(post.comments||[]).map(c => `<div style="margin:8px 0;"><span style="color:var(--gold);font-size:0.8rem;">${c.user} · ${c.time}</span><br><span style="color:#ccc;">${c.text}</span></div>`).join('')}`;
+}
+document.getElementById('internalBackBtn').addEventListener('click', () => {
+    document.getElementById('internalPostDetail').style.display = 'none';
+    document.getElementById('internalPostList').style.display = 'grid';
+    renderInternalPosts();
+});
+document.getElementById('internalNewPostBtn').addEventListener('click', () => {
+    const title = prompt('帖子标题：');
+    if (!title) return;
+    const content = prompt('帖子内容：');
+    if (!content) return;
+    internalPosts.push({ id:'ip'+Date.now(), title, content, author: currentUser ? currentUser.name : '匿名', timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
+    safeSet('xuju_internal_posts', internalPosts);
+    renderInternalPosts();
+});
+document.getElementById('internalCommentBtn').addEventListener('click', () => {
+    const text = document.getElementById('internalCommentInput').value.trim();
+    if (!text) return;
+    const postId = document.getElementById('internalPostDetail').dataset.currentId;
+    const post = internalPosts.find(p => p.id === postId);
+    if (!post) return;
+    post.comments = post.comments || [];
+    post.comments.push({ user: currentUser ? currentUser.name : '匿名', text, time:new Date().toLocaleString('zh-CN') });
+    safeSet('xuju_internal_posts', internalPosts);
+    showInternalPostDetail(postId);
+    document.getElementById('internalCommentInput').value = '';
+});
+
+// 悬赏榜
+function renderMissions() {
+    document.getElementById('missionsList').innerHTML = missions.map(m => `
+        <div class="mission-item risk-${m.risk}">
+            <div class="mission-title">${m.title}</div>
+            <div class="mission-meta"><span>风险: ${m.risk}</span><span>状态: ${m.status}</span><span>截止: ${m.deadline}</span></div>
+            <div class="mission-desc">${m.desc}</div>
+        </div>`).join('');
+}
+
+// 个人主页
+function updateProfilePanel() {
+    if (!currentUser) return;
+    document.getElementById('profileName').textContent = currentUser.name;
+    document.getElementById('profileId').textContent = currentUser.id;
+    document.getElementById('loginCount').textContent = userLoginCounts[currentUser.id] || 0;
+    document.getElementById('profileRole').textContent = currentUser.isAdmin ? '管理员' : '访客';
+    document.getElementById('profileAvatar').textContent = currentUser.name.charAt(0);
+    const uid = currentUser.id;
+    document.getElementById('favList').innerHTML = (userFavorites[uid]||[]).map(id => {
+        const a = archiveData.find(x => x.id === id);
+        return a ? `<div onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${a.id} ${a.title}</div>` : '';
+    }).join('') || '暂无收藏';
+    document.getElementById('historyList').innerHTML = (userHistory[uid]||[]).slice(0,10).map(id => {
+        const a = archiveData.find(x => x.id === id);
+        return a ? `<div onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${a.id} ${a.title}</div>` : '';
+    }).join('') || '暂无记录';
+}
+
+// 管理面板
+function renderAdminList() {
+    document.getElementById('adminList').innerHTML = archiveData.map(a => `
+        <div class="admin-item">
+            <span class="admin-item-id">${a.id}</span>
+            <span class="admin-item-title">${a.title}</span>
+            <small style="color:#666;">[${a.category}]</small>
+            <button onclick="editArchive('${a.id}')" style="background:transparent;border:1px solid #555;color:#aaa;cursor:pointer;">编辑</button>
+        </div>`).join('');
+}
+let editingId = null;
+window.editArchive = function(id) {
+    const item = archiveData.find(a => a.id === id);
+    if (!item) return;
+    editingId = id;
+    document.getElementById('editId').value = item.id;
+    document.getElementById('editTitle').value = item.title;
+    document.getElementById('editCategory').value = item.category;
+    document.getElementById('editTags').value = item.tags.join(', ');
+    document.getElementById('editSummary').value = item.summary;
+    document.getElementById('editContent').value = item.content;
+    document.getElementById('modalTitle').textContent = '编辑: ' + id;
+    document.getElementById('editModal').style.display = 'flex';
+};
+function saveEdit() {
+    const newData = {
+        id: document.getElementById('editId').value.trim(),
+        title: document.getElementById('editTitle').value.trim(),
+        category: document.getElementById('editCategory').value,
+        tags: document.getElementById('editTags').value.split(',').map(s=>s.trim()).filter(s=>s),
+        summary: document.getElementById('editSummary').value.trim(),
+        content: document.getElementById('editContent').value.trim()
+    };
+    if(!newData.id||!newData.title) return alert('编号和标题必填');
+    if(editingId) { const idx = archiveData.findIndex(a=>a.id===editingId); if(idx>-1) archiveData[idx]=newData; }
+    else archiveData.push(newData);
+    safeSet('xuju_archive', archiveData);
+    document.getElementById('editModal').style.display='none';
+    renderAdminList(); renderArchiveList(); updateProfilePanel();
+}
+function deleteArchive() {
+    if(!editingId||!confirm('永久删除？')) return;
+    archiveData = archiveData.filter(a=>a.id!==editingId);
+    safeSet('xuju_archive', archiveData);
+    document.getElementById('editModal').style.display='none';
+    renderAdminList(); renderArchiveList();
+}
+function setupEditorEvents() {
+    document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
+    document.getElementById('deleteArchiveBtn').addEventListener('click', deleteArchive);
+    document.getElementById('closeModalBtn').addEventListener('click', ()=>document.getElementById('editModal').style.display='none');
+    document.getElementById('addNewArchiveBtn').addEventListener('click', ()=>{
+        editingId=null;
+        ['editId','editTitle','editTags','editSummary','editContent'].forEach(f=>document.getElementById(f).value='');
+        document.getElementById('editCategory').value='世界观';
+        document.getElementById('modalTitle').textContent='新增档案';
+        document.getElementById('editModal').style.display='flex';
+    });
+    document.getElementById('resetDefaultBtn').addEventListener('click', ()=>{
+        if(confirm('重置所有档案？')) { archiveData = JSON.parse(JSON.stringify(DEFAULT_ARCHIVES)); safeSet('xuju_archive', archiveData); renderAdminList(); renderArchiveList(); }
+    });
+    document.getElementById('insertImageBtn').addEventListener('click', ()=>{
+        const url = prompt('图片链接：'); if(url) document.getElementById('editContent').value += `<img src="${url}" style="max-width:200px;">`;
+    });
+    const dropZone = document.getElementById('imageDropZone');
+    const contentTA = document.getElementById('editContent');
+    ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('dragover'); }));
+    ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('dragover'); }));
+    dropZone.addEventListener('drop', e=>{
+        [...e.dataTransfer.files].forEach(file=>{
+            if(!file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = ev => contentTA.value += `<img src="${ev.target.result}" style="max-width:200px;">`;
+            reader.readAsDataURL(file);
+        });
+    });
+}
+
+// 环境效果
+function setupAudio() {
+    const audio = document.getElementById('bgAudio');
+    if (DEFAULT_AUDIO_SRC) {
+        document.getElementById('audioSource').src = DEFAULT_AUDIO_SRC;
+        audio.load();
+        audio.volume = 0.3;
+        // 尝试自动播放（如果被拦截，用户点击按钮时也能播）
+        audio.muted = true; // 先静音
+        audio.play().then(() => {
+            audio.muted = false; // 播放成功后再取消静音
+            document.getElementById('audioIndicator').textContent = '🔊';
+        }).catch(() => {
+            audio.muted = false;
+        });
+    }
+    document.getElementById('audioToggleBtn').addEventListener('click', ()=>{
+        if(audio.paused){
+            audio.muted = false;
+            audio.play().then(() => {
+                document.getElementById('audioToggleBtn').textContent='暂停';
+                document.getElementById('audioIndicator').textContent='🔊';
+            }).catch(err => console.log('播放失败', err));
+        } else {
+            audio.pause();
+            document.getElementById('audioToggleBtn').textContent='播放';
+            document.getElementById('audioIndicator').textContent='🔇';
+        }
+    });
+    document.getElementById('volumeSlider').addEventListener('input', e => {
+        audio.volume = e.target.value/100;
+        audio.muted = false;
+    });
+}
+function startRain() {
+    const canvas = document.getElementById('rainCanvas');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    const drops = Array.from({length:300}, ()=>({x:Math.random()*canvas.width, y:Math.random()*canvas.height, speed:6+Math.random()*10, len:10+Math.random()*15}));
+    function draw() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.strokeStyle='rgba(180,190,200,0.6)'; ctx.lineWidth=1;
+        ctx.beginPath();
+        drops.forEach(d=>{ ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-1,d.y+d.len); d.y+=d.speed; if(d.y>canvas.height){ d.y=-10; d.x=Math.random()*canvas.width; } });
+        ctx.stroke();
+        requestAnimationFrame(draw);
+    }
+    draw();
+}
+function startTypewriter() {
+    const el = document.getElementById('typewriterText');
+    const msg = "欢迎回来，操作员。认知污染监测正常。";
+    el.textContent = ''; let i=0;
+    const t = setInterval(() => { if(i<msg.length) el.textContent += msg.charAt(i++); else clearInterval(t); }, 70);
+}
+setInterval(()=>{
+    const flash = document.getElementById('glitchFlash');
+    if(Math.random()<0.04){ flash.style.background='rgba(255,0,0,0.06)'; setTimeout(()=>flash.style.background='transparent',120); }
+},2500);
+
+// ============ 初始渲染 ============
+try {
+    renderPostList();
+} catch(e) {
+    console.error('论坛渲染失败:', e);
 }
