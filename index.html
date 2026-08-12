@@ -3,178 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗巷 - Dark Alley BBS</title>
+    <title>暗巷 | 匿名灵异论坛</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- 全局效果 -->
-    <canvas id="rainCanvas"></canvas>
-    <div class="scanlines"></div>
-    <div class="glitch-flash" id="glitchFlash"></div>
+    <!-- 全局效果：雨滴（仅在终端主页显示，由JS控制） -->
+    <canvas id="rainCanvas" style="display:none;"></canvas>
 
-    <!-- ========== 表层：暗巷论坛 ========== -->
-    <div id="forumContainer">
+    <!-- ==================== 暗巷论坛（表层） ==================== -->
+    <div id="forumContainer" class="forum-wrapper">
         <header class="forum-header">
-            <div class="forum-logo">
-                <span class="logo-icon">🕳️</span>
-                <h1>暗巷</h1>
-                <small>Dark Alley BBS · 所有帖子将在72小时内从记忆中消失</small>
-            </div>
-            <div class="forum-nav">
-                <button id="homeBtn" class="forum-btn active">首页</button>
-                <button id="newPostBtn" class="forum-btn">+ 发帖</button>
-                <button id="awakenBtn" class="forum-btn awaken-entry" title="觉醒者入口">⚠</button>
+            <div class="forum-logo">暗 巷</div>
+            <nav class="forum-nav">
+                <a href="#" id="forumHomeLink" class="nav-link active">首页</a>
+                <a href="#" id="forumNewPostLink" class="nav-link">发帖</a>
+            </nav>
+            <div class="forum-actions">
+                <button id="awakenEntryBtn" class="awaken-btn">觉醒者入口</button>
             </div>
         </header>
 
-        <!-- 论坛主内容区：帖子列表 -->
-        <div id="threadList" class="forum-panel active">
-            <div class="thread-list" id="threadContainer"></div>
-        </div>
+        <main class="forum-content">
+            <!-- 帖子列表 -->
+            <section id="postListView" class="post-list-container">
+                <div class="list-header">
+                    <h2>最新讨论</h2>
+                    <span class="list-note">* 本站为匿名讨论区，所有内容均系网友自发上传</span>
+                </div>
+                <div id="postList" class="post-list"></div>
+            </section>
 
-        <!-- 帖子详情页 -->
-        <div id="threadDetail" class="forum-panel" style="display:none;">
-            <button id="backToListBtn" class="forum-btn">← 返回列表</button>
-            <div id="detailContent"></div>
-            <div class="reply-section">
-                <h3>回复</h3>
-                <textarea id="replyInput" placeholder="输入回复内容..."></textarea>
-                <button id="submitReplyBtn" class="forum-btn">提交回复</button>
-            </div>
-        </div>
+            <!-- 帖子详情 -->
+            <section id="postDetailView" class="post-detail-container" style="display:none;">
+                <button id="backToListBtn" class="back-btn">← 返回列表</button>
+                <div id="postDetailContent"></div>
+                <div class="comment-section">
+                    <h3>回复</h3>
+                    <div id="commentList"></div>
+                    <div class="comment-form">
+                        <input type="text" id="commentInput" placeholder="说点什么吧（匿名）..." maxlength="500">
+                        <button id="submitCommentBtn">发表</button>
+                    </div>
+                </div>
+            </section>
 
-        <!-- 发帖页 -->
-        <div id="newPostPanel" class="forum-panel" style="display:none;">
-            <button id="cancelPostBtn" class="forum-btn">← 取消</button>
-            <input type="text" id="postTitle" placeholder="帖子标题">
-            <textarea id="postContent" placeholder="内容..."></textarea>
-            <button id="submitPostBtn" class="forum-btn">发布帖子</button>
-        </div>
+            <!-- 发帖表单 -->
+            <section id="newPostForm" class="new-post-container" style="display:none;">
+                <button id="cancelNewPostBtn" class="back-btn">← 取消</button>
+                <h2>发布新讨论</h2>
+                <input type="text" id="newPostTitle" placeholder="标题" maxlength="100">
+                <textarea id="newPostContent" placeholder="内容（支持换行）" rows="8"></textarea>
+                <button id="submitNewPostBtn" class="submit-btn">发布</button>
+            </section>
+        </main>
     </div>
 
-    <!-- ========== 里层：墟管局终端（初始隐藏） ========== -->
-    <div id="terminalWrapper" style="display:none;">
-        <div class="main-container" id="mainContainer">
-            <header class="top-bar">
-                <div class="status-line">
-                    <span>终端ID: QYXH-2026-001</span>
-                    <span>密级: <span class="blink">绝密</span></span>
-                    <span>操作员: <span id="topUsername">---</span></span>
-                    <span id="topAdminBadge" style="display:none;color:#ffcc00;">[管理员]</span>
-                    <span class="audio-indicator" id="audioIndicator">🔇</span>
-                </div>
-                <nav class="main-nav">
-                    <button class="nav-btn active" data-panel="home">🏠 主页</button>
-                    <button class="nav-btn" data-panel="archive">📁 档案检索</button>
-                    <button class="nav-btn" data-panel="profile">👤 个人主页</button>
-                    <button class="nav-btn admin-only" data-panel="admin" style="display:none;">⚙️ 管理</button>
-                    <button class="nav-btn" id="backToForumBtn">⟵ 返回暗巷</button>
-                </nav>
-            </header>
-            <div class="panel-container">
-                <!-- 主页 -->
-                <div class="panel active" id="homePanel">
-                    <div class="home-banner">
-                        <div class="home-audio-box">
-                            <span class="audio-label">🎧 环境声</span>
-                            <audio id="bgAudio" loop preload="auto"><source src="" id="audioSource"></audio>
-                            <button id="audioToggleBtn" class="audio-btn">暂停</button>
-                            <input type="range" id="volumeSlider" min="0" max="100" value="30" class="volume-slider">
-                        </div>
-                        <h1 class="typewriter" id="typewriterText"></h1>
-                    </div>
-                    <div class="home-announcement">
-                        <div class="announce-title">📢 总局公告</div>
-                        <div class="announce-body" id="announceBody">
-                            <p>· 2026.01.01  认知污染监测网全系统升级完成。</p>
-                            <p>· 2025.12.30  临川事件记忆抹除率 98.7%。</p>
-                            <p>· 赤级以上墟域严禁单独行动。</p>
-                        </div>
-                    </div>
-                    <div class="home-index-grid">
-                        <div class="index-card" data-cat="世界观"><span class="index-icon icon-scroll"></span><span class="index-label">世界观档案</span><small>总纲·历史·分级</small></div>
-                        <div class="index-card" data-cat="人物"><span class="index-icon icon-agent"></span><span class="index-label">觉醒者档案</span><small>民俗社五人众</small></div>
-                        <div class="index-card" data-cat="收容物"><span class="index-icon icon-artifact"></span><span class="index-label">收容物规程</span><small>分类·禁忌·编号</small></div>
-                        <div class="index-card" data-cat="事件"><span class="index-icon icon-alert"></span><span class="index-label">事件记录</span><small>临川高中事件</small></div>
-                        <div class="index-card" data-cat="附录"><span class="index-icon icon-doc"></span><span class="index-label">附录资料</span><small>舆情·手抄本</small></div>
-                        <div class="index-card" data-cat="国际"><span class="index-icon icon-globe"></span><span class="index-label">国际参考</span><small>各国管控体系</small></div>
-                    </div>
-                </div>
-                <!-- 档案检索 -->
-                <div class="panel" id="archivePanel">
-                    <div class="archive-nav-tabs">
-                        <button class="cat-tab active" data-category="all">全部</button>
-                        <button class="cat-tab" data-category="世界观">世界观</button>
-                        <button class="cat-tab" data-category="人物">人物</button>
-                        <button class="cat-tab" data-category="收容物">收容物</button>
-                        <button class="cat-tab" data-category="事件">事件</button>
-                        <button class="cat-tab" data-category="附录">附录</button>
-                        <button class="cat-tab" data-category="国际">国际</button>
-                    </div>
-                    <div class="archive-search">
-                        <span class="prompt">[root@xujuguan ~]# query</span>
-                        <input type="text" id="archiveSearchInput" placeholder="输入关键词检索...">
-                    </div>
-                    <div class="archive-list" id="archiveList"></div>
-                </div>
-                <!-- 个人主页 -->
-                <div class="panel" id="profilePanel">
-                    <div class="profile-card">
-                        <div class="profile-avatar" id="profileAvatar">?</div>
-                        <div class="profile-info">
-                            <h2 id="profileName">操作员</h2>
-                            <p>编号: <span id="profileId">---</span></p>
-                            <p>登录次数: <span id="loginCount">1</span></p>
-                            <p>权限等级: <span id="profileRole">访客</span></p>
-                        </div>
-                    </div>
-                    <div class="profile-section"><h3>📌 收藏的档案</h3><div id="favList" class="profile-list"></div></div>
-                    <div class="profile-section"><h3>🕓 最近浏览</h3><div id="historyList" class="profile-list"></div></div>
-                </div>
-                <!-- 管理面板 -->
-                <div class="panel" id="adminPanel">
-                    <div class="admin-controls">
-                        <button id="addNewArchiveBtn" class="admin-btn">+ 新增档案</button>
-                        <button id="resetDefaultBtn" class="admin-btn danger">⟲ 重置为默认数据</button>
-                    </div>
-                    <div class="admin-list" id="adminList"></div>
-                    <div class="modal-overlay" id="editModal" style="display:none;">
-                        <div class="modal-box">
-                            <h3 id="modalTitle">编辑档案</h3>
-                            <label>编号</label><input type="text" id="editId">
-                            <label>标题</label><input type="text" id="editTitle">
-                            <label>分类</label><select id="editCategory"><option>世界观</option><option>人物</option><option>收容物</option><option>事件</option><option>附录</option><option>国际</option></select>
-                            <label>标签（逗号分隔）</label><input type="text" id="editTags">
-                            <label>摘要</label><textarea id="editSummary" rows="2"></textarea>
-                            <label>详细内容（支持HTML，可拖入图片）</label>
-                            <div class="editor-toolbar"><button type="button" id="insertImageBtn" title="插入图片链接">🔗 插入链接</button></div>
-                            <div class="dropzone" id="imageDropZone">🖼️ 将图片文件拖拽到此处自动嵌入</div>
-                            <textarea id="editContent" rows="10"></textarea>
-                            <div class="modal-actions">
-                                <button id="saveEditBtn" class="admin-btn">保存</button>
-                                <button id="deleteArchiveBtn" class="admin-btn danger">删除档案</button>
-                                <button id="closeModalBtn" class="admin-btn">取消</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 觉醒者登录弹窗（在论坛层弹出） -->
+    <!-- ==================== 觉醒者登录弹窗 ==================== -->
     <div class="modal-overlay" id="awakenModal" style="display:none;">
-        <div class="login-box" style="width:400px; margin:0;">
-            <div class="login-header"><div class="logo-text">觉醒者验证</div><div class="logo-sub">墟管局内部终端入口</div></div>
+        <div class="modal-box awaken-login-box">
+            <button class="modal-close" id="closeAwakenModalBtn">✕</button>
+            <div class="login-header">
+                <div class="logo-icon">⚠️</div>
+                <div class="logo-text">全域墟化现象管控总局</div>
+                <div class="logo-sub">INTERNAL ARCHIVE TERMINAL</div>
+            </div>
+            <div class="login-warning">
+                <span class="warning-icon">🔒</span> 仅限司级以上人员登录<br>未授权访问将触发认知污染追踪
+            </div>
             <div class="login-form">
                 <label class="input-label">员工编号</label>
-                <input type="text" id="awakenIdInput" placeholder="例: QYXH-2026-001">
+                <input type="text" id="staffIdInput" placeholder="例: QYXH-2026-001" autofocus>
                 <label class="input-label">验证口令</label>
-                <input type="password" id="awakenPassInput" placeholder="输入动态口令">
-                <button id="awakenLoginBtn" class="admin-btn">◈ 进入终端 ◈</button>
-                <div id="awakenError" class="error-msg"></div>
+                <input type="password" id="passwordInput" placeholder="输入动态口令">
+                <button id="loginBtn">◈ 连接终端 ◈</button>
+                <div class="login-hint">
+                    默认访客：<code>QYXH-GUEST</code> / <code>visitor</code><br>
+                    管理员：<code>ADMIN-001</code> / <code>admin123</code>
+                </div>
+                <div id="loginError" class="error-msg"></div>
             </div>
-            <button id="closeAwakenModalBtn" class="admin-btn" style="margin-top:10px;">取消</button>
+        </div>
+    </div>
+
+    <!-- ==================== 墟管局内部终端（登录后显示） ==================== -->
+    <div class="main-container" id="terminalContainer" style="display: none;">
+        <!-- 扫描线等效果层 -->
+        <div class="scanlines"></div>
+        <div class="glitch-flash" id="glitchFlash"></div>
+
+        <header class="top-bar">
+            <div class="status-line">
+                <span>终端ID: QYXH-2026-001</span>
+                <span>密级: <span class="blink">绝密</span></span>
+                <span>操作员: <span id="topUsername">---</span></span>
+                <span id="topAdminBadge" style="display:none;color:#ffcc00;">[管理员]</span>
+                <span class="audio-indicator" id="audioIndicator">🔇</span>
+            </div>
+            <nav class="main-nav">
+                <button class="nav-btn active" data-panel="home">🏠 主页</button>
+                <button class="nav-btn" data-panel="archive">📁 档案检索</button>
+                <button class="nav-btn" data-panel="profile">👤 个人主页</button>
+                <button class="nav-btn admin-only" data-panel="admin" style="display:none;">⚙️ 管理</button>
+                <button class="nav-btn logout-btn-top" id="logoutTopBtn">⏻ 断开</button>
+            </nav>
+        </header>
+
+        <div class="panel-container">
+            <!-- 主页 -->
+            <div class="panel active" id="homePanel">
+                <div class="home-banner">
+                    <div class="home-audio-box">
+                        <span class="audio-label">🎧 环境声</span>
+                        <audio id="bgAudio" loop preload="auto">
+                            <source src="" id="audioSource">
+                        </audio>
+                        <button id="audioToggleBtn" class="audio-btn">暂停</button>
+                        <input type="range" id="volumeSlider" min="0" max="100" value="30" class="volume-slider">
+                    </div>
+                    <h1 class="typewriter" id="typewriterText"></h1>
+                </div>
+                <div class="home-announcement">
+                    <div class="announce-title">📢 总局公告</div>
+                    <div class="announce-body" id="announceBody">
+                        <p>· 2026.01.01  认知污染监测网全系统升级完成。</p>
+                        <p>· 2025.12.30  临川事件记忆抹除率 98.7%。</p>
+                        <p>· 赤级以上墟域严禁单独行动。</p>
+                    </div>
+                </div>
+                <div class="home-index-grid">
+                    <div class="index-card" data-cat="世界观"><span class="index-icon">📜</span><span class="index-label">世界观档案</span><small>总纲 · 历史 · 分级</small></div>
+                    <div class="index-card" data-cat="人物"><span class="index-icon">🕵️</span><span class="index-label">觉醒者档案</span><small>民俗社五人众</small></div>
+                    <div class="index-card" data-cat="收容物"><span class="index-icon">⚱️</span><span class="index-label">收容物规程</span><small>分类 · 禁忌 · 编号</small></div>
+                    <div class="index-card" data-cat="事件"><span class="index-icon">⚠️</span><span class="index-label">事件记录</span><small>临川高中事件</small></div>
+                    <div class="index-card" data-cat="附录"><span class="index-icon">📰</span><span class="index-label">附录资料</span><small>舆情 · 手抄本</small></div>
+                    <div class="index-card" data-cat="国际"><span class="index-icon">🌍</span><span class="index-label">国际参考</span><small>各国管控体系</small></div>
+                </div>
+            </div>
+            <!-- 档案检索 -->
+            <div class="panel" id="archivePanel">
+                <div class="archive-nav-tabs">
+                    <button class="cat-tab active" data-category="all">全部</button>
+                    <button class="cat-tab" data-category="世界观">世界观</button>
+                    <button class="cat-tab" data-category="人物">人物</button>
+                    <button class="cat-tab" data-category="收容物">收容物</button>
+                    <button class="cat-tab" data-category="事件">事件</button>
+                    <button class="cat-tab" data-category="附录">附录</button>
+                    <button class="cat-tab" data-category="国际">国际</button>
+                </div>
+                <div class="archive-search">
+                    <span class="prompt">[root@xujuguan ~]# query</span>
+                    <input type="text" id="archiveSearchInput" placeholder="输入关键词检索...">
+                </div>
+                <div class="archive-list" id="archiveList"></div>
+            </div>
+            <!-- 个人主页 -->
+            <div class="panel" id="profilePanel">
+                <div class="profile-card">
+                    <div class="profile-avatar" id="profileAvatar">?</div>
+                    <div class="profile-info">
+                        <h2 id="profileName">操作员</h2>
+                        <p>编号: <span id="profileId">---</span></p>
+                        <p>登录次数: <span id="loginCount">1</span></p>
+                        <p>权限等级: <span id="profileRole">访客</span></p>
+                    </div>
+                </div>
+                <div class="profile-section">
+                    <h3>📌 收藏的档案</h3>
+                    <div id="favList" class="profile-list">暂无收藏</div>
+                </div>
+                <div class="profile-section">
+                    <h3>🕓 最近浏览</h3>
+                    <div id="historyList" class="profile-list">暂无记录</div>
+                </div>
+            </div>
+            <!-- 管理面板 -->
+            <div class="panel" id="adminPanel">
+                <div class="admin-controls">
+                    <button id="addNewArchiveBtn" class="admin-btn">+ 新增档案</button>
+                    <button id="resetDefaultBtn" class="admin-btn danger">⟲ 重置为默认数据</button>
+                </div>
+                <div class="admin-list" id="adminList"></div>
+                <!-- 编辑弹窗 -->
+                <div class="modal-overlay" id="editModal" style="display:none;">
+                    <div class="modal-box">
+                        <h3 id="modalTitle">编辑档案</h3>
+                        <label>编号</label>
+                        <input type="text" id="editId">
+                        <label>标题</label>
+                        <input type="text" id="editTitle">
+                        <label>分类</label>
+                        <select id="editCategory">
+                            <option>世界观</option><option>人物</option><option>收容物</option>
+                            <option>事件</option><option>附录</option><option>国际</option>
+                        </select>
+                        <label>标签（逗号分隔）</label>
+                        <input type="text" id="editTags">
+                        <label>摘要</label>
+                        <textarea id="editSummary" rows="2"></textarea>
+                        <label>详细内容（支持HTML，可拖入图片）</label>
+                        <div class="editor-toolbar">
+                            <button type="button" id="insertImageBtn">🔗 插入链接</button>
+                        </div>
+                        <div class="dropzone" id="imageDropZone">🖼️ 将图片文件拖拽到此处自动嵌入</div>
+                        <textarea id="editContent" rows="10"></textarea>
+                        <div class="modal-actions">
+                            <button id="saveEditBtn" class="admin-btn">保存</button>
+                            <button id="deleteArchiveBtn" class="admin-btn danger">删除档案</button>
+                            <button id="closeModalBtn" class="admin-btn">取消</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
