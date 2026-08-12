@@ -1,10 +1,9 @@
-// ====================== 全局配置 ======================
+// 配置
 const ADMIN_ID = 'ADMIN-001';
 const ADMIN_PASS = 'admin123';
-// 在这里填入你的环境音效链接，留空则不自动播放
-const DEFAULT_AUDIO_SRC = ''; // 例如: 'audio/rain_ambient.mp3'
+const DEFAULT_AUDIO_SRC = ''; // 填入你的音频链接
 
-// 默认档案数据（精简示例，你需要把完整数据补入）
+// 默认数据（示例，需补全）
 const DEFAULT_ARCHIVE_DATA = [
     {
         id: "QYXH-2026-001", title: "墟化现象总纲·绝密节选", category: "世界观",
@@ -24,12 +23,10 @@ const DEFAULT_ARCHIVE_DATA = [
         <p><strong>锚点：</strong>兔形兽化 | 隐匿欺诈、近身穿刺爆发</p>
         <p><strong>收容物：</strong>LC-Q-037 “逢雨”（黑伞）</p>`
     }
-    // 请在此处补充其余所有档案...
 ];
 
-// ====================== 状态管理 ======================
+// 状态
 let currentUser = null;
-let currentPanel = 'home';
 let archiveData = [];
 let userFavorites = JSON.parse(localStorage.getItem('xuju_favs') || '{}');
 let userHistory = JSON.parse(localStorage.getItem('xuju_history') || '{}');
@@ -48,29 +45,24 @@ function resetToDefault() {
     renderArchiveList();
 }
 
-// ====================== 用户登录 ======================
-const loginContainer = document.getElementById('loginContainer');
-const mainContainer = document.getElementById('mainContainer');
-const loginError = document.getElementById('loginError');
-
+// 登录
 function attemptLogin() {
     const id = document.getElementById('staffIdInput').value.trim();
     const pass = document.getElementById('passwordInput').value.trim();
     let user = null;
     if (id === ADMIN_ID && pass === ADMIN_PASS) user = { id, name: '系统管理员', isAdmin: true };
     else if (id === 'QYXH-GUEST' && pass === 'visitor') user = { id, name: '临时访客', isAdmin: false };
-    else if (id === 'L-09-01-S' && pass === 'fengyu') user = { id, name: '苏晚眠（档案查阅）', isAdmin: false };
-    else { loginError.textContent = '[!] 身份验证失败'; return; }
+    else if (id === 'L-09-01-S' && pass === 'fengyu') user = { id, name: '苏晚眠', isAdmin: false };
+    else { document.getElementById('loginError').textContent = '[!] 身份验证失败'; return; }
 
     currentUser = user;
-    // 更新登录次数
     userLoginCounts[id] = (userLoginCounts[id] || 0) + 1;
     localStorage.setItem('xuju_logincounts', JSON.stringify(userLoginCounts));
     if (!userFavorites[id]) userFavorites[id] = [];
     if (!userHistory[id]) userHistory[id] = [];
 
-    loginContainer.style.display = 'none';
-    mainContainer.style.display = 'block';
+    document.getElementById('loginContainer').style.display = 'none';
+    document.getElementById('mainContainer').style.display = 'block';
     document.getElementById('topUsername').textContent = user.name;
     if (user.isAdmin) {
         document.getElementById('topAdminBadge').style.display = 'inline';
@@ -85,8 +77,8 @@ function attemptLogin() {
 
 function logout() {
     currentUser = null;
-    mainContainer.style.display = 'none';
-    loginContainer.style.display = 'block';
+    document.getElementById('mainContainer').style.display = 'none';
+    document.getElementById('loginContainer').style.display = 'block';
     document.getElementById('staffIdInput').value = '';
     document.getElementById('passwordInput').value = '';
 }
@@ -95,38 +87,33 @@ document.getElementById('loginBtn').addEventListener('click', attemptLogin);
 document.getElementById('passwordInput').addEventListener('keypress', e => { if(e.key==='Enter') attemptLogin(); });
 document.getElementById('logoutTopBtn').addEventListener('click', logout);
 
-// ====================== 面板切换 ======================
+// 面板切换
 const panels = {
     home: document.getElementById('homePanel'),
     archive: document.getElementById('archivePanel'),
     profile: document.getElementById('profilePanel'),
     admin: document.getElementById('adminPanel')
 };
-const navBtns = document.querySelectorAll('.nav-btn[data-panel]');
-
 function switchPanel(name) {
     Object.values(panels).forEach(p => p.classList.remove('active'));
     panels[name].classList.add('active');
-    navBtns.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-btn[data-panel]').forEach(b => b.classList.remove('active'));
     const btn = document.querySelector(`.nav-btn[data-panel="${name}"]`);
     if (btn) btn.classList.add('active');
-    currentPanel = name;
     if (name === 'archive') renderArchiveList();
     if (name === 'admin') renderAdminList();
     if (name === 'profile') updateProfilePanel();
 }
-
-navBtns.forEach(btn => btn.addEventListener('click', () => switchPanel(btn.dataset.panel)));
+document.querySelectorAll('.nav-btn[data-panel]').forEach(b => b.addEventListener('click', () => switchPanel(b.dataset.panel)));
 document.querySelectorAll('.index-card').forEach(card => {
     card.addEventListener('click', () => {
         const cat = card.dataset.cat;
         const tab = document.querySelector(`.cat-tab[data-category="${cat}"]`);
-        if (tab) tab.click();
-        switchPanel('archive');
+        if (tab) { tab.click(); switchPanel('archive'); }
     });
 });
 
-// ====================== 环境音效 ======================
+// 音频
 function setupAudio() {
     const audio = document.getElementById('bgAudio');
     const btn = document.getElementById('audioToggleBtn');
@@ -140,61 +127,43 @@ function setupAudio() {
         indicator.textContent = '🔊';
     }
     btn.addEventListener('click', () => {
-        if (audio.paused) {
-            audio.play();
-            btn.textContent = '暂停';
-            indicator.textContent = '🔊';
-        } else {
-            audio.pause();
-            btn.textContent = '播放';
-            indicator.textContent = '🔇';
-        }
+        if (audio.paused) { audio.play(); btn.textContent = '暂停'; indicator.textContent = '🔊'; }
+        else { audio.pause(); btn.textContent = '播放'; indicator.textContent = '🔇'; }
     });
-    slider.addEventListener('input', () => {
-        audio.volume = slider.value / 100;
-    });
+    slider.addEventListener('input', () => audio.volume = slider.value / 100);
 }
 
-// ====================== 下雨效果 ======================
+// 下雨
 function startRain() {
     const canvas = document.getElementById('rainCanvas');
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const drops = [];
-    for (let i = 0; i < 300; i++) {
-        drops.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            speed: 6 + Math.random() * 10,
-            len: 10 + Math.random() * 15
-        });
-    }
+    const drops = Array.from({length:300}, () => ({
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height,
+        speed: 6+Math.random()*10,
+        len: 10+Math.random()*15
+    }));
     function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = 'rgba(180, 190, 200, 0.6)';
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.strokeStyle = 'rgba(180,190,200,0.6)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         for (let d of drops) {
             ctx.moveTo(d.x, d.y);
-            ctx.lineTo(d.x - 1, d.y + d.len);
+            ctx.lineTo(d.x-1, d.y+d.len);
             d.y += d.speed;
-            if (d.y > canvas.height) {
-                d.y = -10;
-                d.x = Math.random() * canvas.width;
-            }
+            if (d.y > canvas.height) { d.y = -10; d.x = Math.random()*canvas.width; }
         }
         ctx.stroke();
         requestAnimationFrame(draw);
     }
     draw();
-    window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    });
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
 }
 
-// 打字机效果
+// 打字机
 function startTypewriter() {
     const el = document.getElementById('typewriterText');
     const msg = "欢迎回来，操作员。认知污染监测正常。";
@@ -206,7 +175,7 @@ function startTypewriter() {
     }, 70);
 }
 
-// 随机故障效果
+// 故障闪烁
 setInterval(() => {
     const flash = document.getElementById('glitchFlash');
     if (Math.random() < 0.04) {
@@ -215,7 +184,7 @@ setInterval(() => {
     }
 }, 2500);
 
-// ====================== 档案检索 ======================
+// 档案检索
 let activeCategory = 'all';
 document.querySelectorAll('.cat-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -259,31 +228,31 @@ function renderArchiveList() {
         card.querySelector('.fav-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             toggleFavorite(item.id);
-            renderArchiveList(); // 刷新按钮状态
+            renderArchiveList();
         });
         list.appendChild(card);
     });
 }
 
-function addHistory(archiveId) {
+function addHistory(id) {
     if (!currentUser) return;
     const uid = currentUser.id;
-    userHistory[uid] = [archiveId, ...userHistory[uid].filter(id => id !== archiveId)].slice(0, 20);
+    userHistory[uid] = [id, ...userHistory[uid].filter(x => x !== id)].slice(0, 20);
     localStorage.setItem('xuju_history', JSON.stringify(userHistory));
-    if (currentPanel === 'profile') updateProfilePanel();
+    if (document.getElementById('profilePanel').classList.contains('active')) updateProfilePanel();
 }
 
-function toggleFavorite(archiveId) {
+function toggleFavorite(id) {
     if (!currentUser) return;
     const uid = currentUser.id;
     if (!userFavorites[uid]) userFavorites[uid] = [];
-    const idx = userFavorites[uid].indexOf(archiveId);
-    idx > -1 ? userFavorites[uid].splice(idx, 1) : userFavorites[uid].push(archiveId);
+    const idx = userFavorites[uid].indexOf(id);
+    idx > -1 ? userFavorites[uid].splice(idx, 1) : userFavorites[uid].push(id);
     localStorage.setItem('xuju_favs', JSON.stringify(userFavorites));
-    if (currentPanel === 'profile') updateProfilePanel();
+    if (document.getElementById('profilePanel').classList.contains('active')) updateProfilePanel();
 }
 
-// ====================== 个人主页 ======================
+// 个人主页
 function updateProfilePanel() {
     if (!currentUser) return;
     document.getElementById('profileName').textContent = currentUser.name;
@@ -293,25 +262,20 @@ function updateProfilePanel() {
     document.getElementById('profileAvatar').textContent = currentUser.name.charAt(0);
 
     const uid = currentUser.id;
-    const favList = document.getElementById('favList');
-    const favs = userFavorites[uid] || [];
-    favList.innerHTML = favs.length ? favs.map(id => {
+    document.getElementById('favList').innerHTML = (userFavorites[uid]||[]).map(id => {
         const item = archiveData.find(a => a.id === id);
         return item ? `<div class="fav-item" onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${item.id} ${item.title}</div>` : '';
-    }).join('') : '暂无收藏';
+    }).join('') || '暂无收藏';
 
-    const histList = document.getElementById('historyList');
-    const hist = (userHistory[uid] || []).slice(0, 10);
-    histList.innerHTML = hist.length ? hist.map(id => {
+    document.getElementById('historyList').innerHTML = (userHistory[uid]||[]).slice(0,10).map(id => {
         const item = archiveData.find(a => a.id === id);
         return item ? `<div class="history-item" onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${item.id} ${item.title}</div>` : '';
-    }).join('') : '暂无记录';
+    }).join('') || '暂无记录';
 }
 
-// ====================== 管理面板 ======================
+// 管理面板
 function renderAdminList() {
-    const list = document.getElementById('adminList');
-    list.innerHTML = archiveData.map((item, idx) => `
+    document.getElementById('adminList').innerHTML = archiveData.map(item => `
         <div class="admin-item">
             <span class="admin-item-id">${item.id}</span>
             <span class="admin-item-title">${item.title}</span>
@@ -368,7 +332,6 @@ function deleteArchive() {
     document.getElementById('editModal').style.display = 'none';
     renderAdminList();
     renderArchiveList();
-    updateProfilePanel();
 }
 
 document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
@@ -384,15 +347,49 @@ document.getElementById('addNewArchiveBtn').addEventListener('click', () => {
 document.getElementById('resetDefaultBtn').addEventListener('click', () => {
     if (confirm('重置为默认数据？所有修改将丢失。')) resetToDefault();
 });
-// 插入图片快捷按钮
+
+// 插入图片链接
 document.getElementById('insertImageBtn').addEventListener('click', () => {
-    const url = prompt('请输入图片链接（如 https://...）');
-    if (url) {
-        const contentArea = document.getElementById('editContent');
-        const imgTag = `<img src="${url}" style="max-width:200px; margin:10px;">`;
-        contentArea.value += imgTag;
-    }
+    const url = prompt('请输入图片链接：');
+    if (url) document.getElementById('editContent').value += `<img src="${url}" style="max-width:200px; margin:10px;">`;
 });
 
-// ====================== 初始化 ======================
+// ---------- 图片拖拽上传 ----------
+const dropZone = document.getElementById('imageDropZone');
+const contentTextarea = document.getElementById('editContent');
+
+['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('dragover');
+    });
+});
+['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+    });
+});
+
+dropZone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+    if (!files.length) return;
+    [...files].forEach(file => {
+        if (!file.type.startsWith('image/')) {
+            alert(`文件 ${file.name} 不是图片，已跳过`);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            const base64 = ev.target.result;
+            const imgTag = `<img src="${base64}" style="max-width:200px; margin:10px;">`;
+            contentTextarea.value += imgTag;
+        };
+        reader.readAsDataURL(file);
+    });
+});
+
+// 初始化
 loadData();
