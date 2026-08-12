@@ -113,7 +113,7 @@ const DEFAULT_ARCHIVES = [
 ];
 
 // ============ 环境音频 ============
-const DEFAULT_AUDIO_SRC = ''; // 填入音频链接，如 'ambient.mp3'
+const DEFAULT_AUDIO_SRC = 'audio/ambient.mp3'; // 填入音频链接，如 'ambient.mp3'
 
 // ============ 内部频道消息 ============
 const DEFAULT_CHANNELS = {
