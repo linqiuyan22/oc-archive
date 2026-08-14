@@ -1,161 +1,4 @@
-// ============ 状态管理 ============
-let currentUser = null;
-let archiveData = [];
-let userFavorites = {};
-let userHistory = {};
-let userLoginCounts = {};
-let currentPanel = 'home', activeCategory = 'all';
-let currentChannel = 'main';
-let lingshiMessages = {};
-let internalPosts = [];
-let missions = [];
-
-// 安全地从 localStorage 读取，出错时返回空对象/数组
-function safeGetJSON(key, fallback) {
-    try {
-        const raw = localStorage.getItem(key);
-        if (raw === null || raw === 'null' || raw === undefined) return fallback;
-        return JSON.parse(raw);
-    } catch(e) {
-        return fallback;
-    }
-}
-function safeSet(key, value) {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-    } catch(e) {
-        console.warn('localStorage 写入失败:', e);
-    }
-}
-
-// ============ 加载过场动画（修复版） ============
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.style.opacity = '0';
-            setTimeout(() => {
-                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-            }, 500);
-        }
-    }, 1500); // 1.5秒后自动消失，确保不会卡住
-});
-
-// 备用：如果 load 事件已过，立即移除加载动画
-setTimeout(() => {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.style.opacity = '0';
-        setTimeout(() => {
-            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-        }, 500);
-    }
-}, 3000); // 3秒兜底
-
-// ============ 论坛数据 ============
-let forumPosts = safeGetJSON('darkalley_posts', null);
-if (!forumPosts || !Array.isArray(forumPosts) || forumPosts.length === 0) {
-    forumPosts = JSON.parse(JSON.stringify(DEFAULT_POSTS));
-    safeSet('darkalley_posts', forumPosts);
-}
-function savePosts() { safeSet('darkalley_posts', forumPosts); }
-
-// ============ 内部数据初始化 ============
-lingshiMessages = safeGetJSON('xuju_lingshi', null);
-if (!lingshiMessages || typeof lingshiMessages !== 'object' || Object.keys(lingshiMessages).length === 0) {
-    lingshiMessages = JSON.parse(JSON.stringify(DEFAULT_CHANNELS));
-    safeSet('xuju_lingshi', lingshiMessages);
-}
-
-internalPosts = safeGetJSON('xuju_internal_posts', null);
-if (!internalPosts || !Array.isArray(internalPosts) || internalPosts.length === 0) {
-    internalPosts = JSON.parse(JSON.stringify(DEFAULT_INTERNAL_POSTS));
-    safeSet('xuju_internal_posts', internalPosts);
-}
-
-missions = safeGetJSON('xuju_missions', null);
-if (!missions || !Array.isArray(missions) || missions.length === 0) {
-    missions = JSON.parse(JSON.stringify(DEFAULT_MISSIONS));
-    safeSet('xuju_missions', missions);
-}
-
-userFavorites = safeGetJSON('xuju_favs', {});
-userHistory = safeGetJSON('xuju_history', {});
-userLoginCounts = safeGetJSON('xuju_logincounts', {});
-
-// ============ 论坛渲染 ============
-function renderPostList() {
-    const list = document.getElementById('postList');
-    if (!list) return;
-    list.innerHTML = forumPosts.slice().reverse().map(p => `
-        <div class="post-item" data-id="${p.id}">
-            <div class="post-title">${p.title}</div>
-            <div class="post-meta"><span>${p.author}</span><span>${p.comments ? p.comments.length : 0} 回复</span><span>${p.timestamp}</span></div>
-        </div>`).join('');
-    document.querySelectorAll('.post-item').forEach(el => el.addEventListener('click', () => showPostDetail(el.dataset.id)));
-    const total = document.getElementById('totalPosts');
-    if (total) total.textContent = forumPosts.length;
-}
-
-function showPostDetail(id) {
-    const post = forumPosts.find(p => p.id === id);
-    if (!post) return;
-    document.getElementById('postListView').style.display = 'none';
-    document.getElementById('newPostForm').style.display = 'none';
-    const detail = document.getElementById('postDetailView');
-    detail.style.display = 'block';
-    detail.dataset.currentId = id;
-    document.getElementById('postDetailContent').innerHTML = `
-        <h1 class="post-detail-title">${post.title}</h1>
-        <div class="post-detail-meta">${post.author} · ${post.timestamp}</div>
-        <div class="post-detail-body">${post.content}</div>`;
-    renderComments(post);
-}
-function renderComments(post) {
-    const comments = post.comments || [];
-    document.getElementById('commentList').innerHTML = comments.map(c => `
-        <div class="comment-item"><div class="comment-meta">${c.user} · ${c.time}</div><div>${c.text}</div></div>`).join('');
-}
-function backToList() {
-    document.getElementById('postDetailView').style.display = 'none';
-    document.getElementById('newPostForm').style.display = 'none';
-    document.getElementById('postListView').style.display = 'block';
-}
-
-// 论坛按钮事件
-document.getElementById('submitNewPostBtn').addEventListener('click', () => {
-    const title = document.getElementById('newPostTitle').value.trim();
-    const content = document.getElementById('newPostContent').value.trim();
-    if (!title || !content) return alert('请填写标题和内容');
-    forumPosts.push({ id:'p'+Date.now(), title, content, author:'匿名_'+Math.floor(Math.random()*0xffff).toString(16), timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
-    savePosts();
-    document.getElementById('newPostTitle').value = '';
-    document.getElementById('newPostContent').value = '';
-    backToList();
-    renderPostList();
-});
-document.getElementById('submitCommentBtn').addEventListener('click', () => {
-    const text = document.getElementById('commentInput').value.trim();
-    if (!text) return;
-    const postId = document.getElementById('postDetailView').dataset.currentId;
-    const post = forumPosts.find(p => p.id === postId);
-    if (!post) return;
-    post.comments = post.comments || [];
-    post.comments.push({ user:'匿名_'+Math.floor(Math.random()*0xffff).toString(16), text, time:new Date().toLocaleString('zh-CN') });
-    savePosts();
-    renderComments(post);
-    document.getElementById('commentInput').value = '';
-});
-document.getElementById('forumHomeLink').addEventListener('click', e => { e.preventDefault(); backToList(); });
-document.getElementById('forumNewPostLink').addEventListener('click', e => { e.preventDefault();
-    document.getElementById('postListView').style.display = 'none';
-    document.getElementById('postDetailView').style.display = 'none';
-    document.getElementById('newPostForm').style.display = 'block';
-});
-document.getElementById('backToListBtn').addEventListener('click', backToList);
-document.getElementById('cancelNewPostBtn').addEventListener('click', backToList);
-
-// ============ 登录系统 ============
+// ============ 全局变量与用户系统 ============
 const VALID_USERS = {
     'ADMIN-001': { pass:'admin123', name:'系统管理员', isAdmin:true },
     'QYXH-GUEST': { pass:'visitor', name:'临时访客', isAdmin:false },
@@ -166,73 +9,662 @@ const VALID_USERS = {
     'L-09-05-L': { pass:'kuanggu', name:'陆烬弦', isAdmin:false }
 };
 
-function attemptLogin() {
-    const id = document.getElementById('staffIdInput').value.trim();
-    const pass = document.getElementById('passwordInput').value.trim();
-    const info = VALID_USERS[id];
-    if (!info || info.pass !== pass) {
-        document.getElementById('loginError').textContent = '[!] 身份验证失败';
-        return false;
+const ARCHIVE_DATA_VERSION = 'xuju-archive-v4-characters';
+
+window.currentUser = null;
+purgeLegacySiteStorage();
+let archiveData = [];
+let userFavorites = {};
+let userHistory = {};
+let userLoginCounts = {};
+let currentPanel = 'home';
+let activeCategory = 'all';
+let activeSubCategory = 'all';
+let currentBoard = 'all';
+let currentChannel = 'main';
+let terminalInited = false;
+let editingId = null;
+let currentInternalPostId = null; 
+
+let forumNickname = localStorage.getItem('darkalley_nickname') || '匿名_' + Math.floor(Math.random()*0xffff).toString(16);
+let forumFriends = safeGetJSON('darkalley_friends', []);
+let forumMessages = safeGetJSON('darkalley_messages', []);
+let lingshiMessages = safeGetJSON('xuju_lingshi', JSON.parse(JSON.stringify(DEFAULT_CHANNELS)));
+let internalPosts = safeGetJSON('xuju_internal_posts', JSON.parse(JSON.stringify(DEFAULT_INTERNAL_POSTS)));
+let missions = safeGetJSON('xuju_missions', JSON.parse(JSON.stringify(DEFAULT_MISSIONS)));
+let checkinState = safeGetJSON('darkalley_checkin', { streak: 0, total: 0, points: 0, lastDate: null, dates: [] });
+
+function safeGetJSON(key, fallback) {
+    try { const raw = localStorage.getItem(key); if (raw === null || raw === 'null' || raw === undefined) return fallback; return JSON.parse(raw); } catch(e) { return fallback; }
+}
+function safeSet(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {} }
+function purgeLegacySiteStorage() {
+    const legacyKeys = [
+        'darkalley_posts', 'darkalley_featured', 'xuju_archive', 'xuju_lingshi',
+        'xuju_internal_posts', 'xuju_missions', 'xuju_logincounts', 'xuju_history',
+        'darkalley_friends', 'darkalley_messages', 'site_local_data_bundle', 'xuju_daily_fortune',
+        'xuju_archive_version'
+    ];
+    const archiveSaved = safeGetJSON('xuju_archive', []);
+    const postsSaved = safeGetJSON('darkalley_posts', []);
+    const archiveVersion = localStorage.getItem('xuju_archive_version');
+    const validCategories = new Set(['墟界管理档案', '叛逃人员档案', '人物档案', '事件分支', '收容物分支']);
+    const legacyTextPattern = /档案条例|总则条例|目录分支|正文内容|\.docx|整篇长文|利用文档|整理自|旧版档案/i;
+    const archiveLooksLegacy = Array.isArray(archiveSaved) && (
+        archiveSaved.length < 10 ||
+        archiveSaved.some(item => {
+            const text = `${item?.title || ''} ${item?.summary || ''} ${item?.content || ''}`;
+            const category = String(item?.category || '');
+            const isOldLabel = legacyTextPattern.test(`${category} ${text}`);
+            const isUnknownCategory = !!category && !validCategories.has(category) && !/^(人物档案|叛逃人员档案|墟界管理档案|事件分支|收容物分支)$/.test(category);
+            return isOldLabel || isUnknownCategory;
+        }) ||
+        archiveVersion !== ARCHIVE_DATA_VERSION
+    );
+    const postsLooksLegacy = Array.isArray(postsSaved) && postsSaved.some(post => {
+        const text = `${post?.title || ''} ${post?.content || ''}`;
+        return /正文内容|档案条例|总则条例|整篇长文|目录分支|旧版档案/i.test(text);
+    });
+    if (archiveLooksLegacy || postsLooksLegacy) {
+        legacyKeys.forEach(key => localStorage.removeItem(key));
+        localStorage.setItem('xuju_archive_version', ARCHIVE_DATA_VERSION);
+        console.log('已清理旧版缓存，恢复为分支式档案结构。');
+    } else if (!archiveVersion) {
+        localStorage.setItem('xuju_archive_version', ARCHIVE_DATA_VERSION);
     }
-    currentUser = { id, name:info.name, isAdmin:info.isAdmin };
-    userLoginCounts[id] = (userLoginCounts[id] || 0) + 1;
+}
+function safePrompt(message) {
+    try {
+        if (typeof window.prompt === 'function') return window.prompt(message);
+    } catch (e) {}
+    return '';
+}
+
+function getDailyFortune() {
+    const today = new Date().toDateString();
+    const saved = safeGetJSON('xuju_daily_fortune', null);
+    if (saved && saved.date === today) return saved.fortune;
+    const fortune = DAILY_FORTUNES[Math.floor(Math.random() * DAILY_FORTUNES.length)];
+    safeSet('xuju_daily_fortune', { date: today, fortune });
+    return fortune;
+}
+
+// ============ 🔥【终极防呆修复】先强制清除本地坏缓存 ============
+let forumPosts = safeGetJSON('darkalley_posts', null);
+if (!forumPosts || !Array.isArray(forumPosts) || forumPosts.length === 0 || forumPosts.length < DEFAULT_POSTS.length) {
+    localStorage.removeItem('darkalley_posts');
+    forumPosts = JSON.parse(JSON.stringify(DEFAULT_POSTS));
+    safeSet('darkalley_posts', forumPosts);
+    console.log("检测到帖子数据异常，已强制重置为完整默认数据");
+}
+
+let featuredPosts = safeGetJSON('darkalley_featured', null);
+if (!featuredPosts || !Array.isArray(featuredPosts) || featuredPosts.length === 0 || featuredPosts.length < FEATURED_POSTS.length) {
+    featuredPosts = JSON.parse(JSON.stringify(FEATURED_POSTS));
+    safeSet('darkalley_featured', featuredPosts);
+} else {
+    featuredPosts = featuredPosts.map(item => ({
+        ...item,
+        postId: item.postId || item.id || 'p1',
+        image: item.image || 'images/feature1.jpg'
+    }));
+    safeSet('darkalley_featured', featuredPosts);
+}
+function savePosts() { safeSet('darkalley_posts', forumPosts); }
+function triggerDataFileDownload(fileName, payload) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+function saveLocalDataBundle() {
+    const payload = {
+        exportedAt: new Date().toISOString(),
+        forumPosts,
+        featuredPosts,
+        archiveData,
+        lingshiMessages,
+        internalPosts,
+        missions,
+        userFavorites,
+        userHistory,
+        forumFriends,
+        forumMessages
+    };
+    safeSet('darkalley_posts', forumPosts);
+    safeSet('darkalley_featured', featuredPosts);
+    safeSet('xuju_archive', archiveData);
+    safeSet('xuju_lingshi', lingshiMessages);
+    safeSet('xuju_internal_posts', internalPosts);
+    safeSet('xuju_missions', missions);
     safeSet('xuju_logincounts', userLoginCounts);
-    if (!userFavorites[id]) userFavorites[id] = [];
-    if (!userHistory[id]) userHistory[id] = [];
-    document.getElementById('forumContainer').style.display = 'none';
-    document.getElementById('awakenModal').style.display = 'none';
-    document.getElementById('terminalContainer').style.display = 'block';
-    document.getElementById('rainCanvas').style.display = 'block';
-    document.getElementById('topUsername').textContent = currentUser.name;
-    if (currentUser.isAdmin) {
-        document.getElementById('topAdminBadge').style.display = 'inline';
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'inline-block');
+    safeSet('xuju_history', userHistory);
+    safeSet('darkalley_friends', forumFriends);
+    safeSet('darkalley_messages', forumMessages);
+    safeSet('site_local_data_bundle', payload);
+    return payload;
+}
+function exportLocalDataBundle() {
+    const payload = saveLocalDataBundle();
+    triggerDataFileDownload('site-local-data.json', payload);
+    return payload;
+}
+function escapeHtml(str = '') {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// ============ 🌟 论坛星星/数据流粒子特效 ============
+let starAnimId = null;
+function startStars() {
+    const canvas = document.getElementById('starCanvas');
+    if (!canvas) return;
+    if(starAnimId) { cancelAnimationFrame(starAnimId); }
+    const ctx = canvas.getContext('2d');
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.removeEventListener('resize', resizeCanvas); window.addEventListener('resize', resizeCanvas); resizeCanvas();
+    const stars = Array.from({length:80}, ()=>({
+        x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+        radius: 0.5 + Math.random()*1.5, speed: 0.2 + Math.random()*0.4,
+        opacity: 0.2 + Math.random()*0.3
+    }));
+    let t = 0;
+    function draw() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        stars.forEach(s => {
+            s.y += s.speed;
+            if(s.y > canvas.height + 10) { s.y = -10; s.x = Math.random()*canvas.width; }
+            const alpha = s.opacity * (0.6 + 0.4 * Math.sin(t + s.x));
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(207, 42, 42, 0.2)';
+            ctx.fill(); ctx.shadowBlur = 0;
+        });
+        t += 0.05;
+        starAnimId = requestAnimationFrame(draw);
     }
-    initTerminal();
-    return true;
+    draw();
 }
 
-function logoutTerminal() {
-    currentUser = null;
-    document.getElementById('terminalContainer').style.display = 'none';
-    document.getElementById('rainCanvas').style.display = 'none';
-    document.getElementById('forumContainer').style.display = 'block';
+// ============ 双音乐播放器系统 ============
+function setupForumMiniPlayer() {
+    const audio = document.getElementById('forumAudio');
+    const sourceEl = document.getElementById('forumAudioSource');
+    if (!sourceEl || !audio) {
+        console.warn("未找到论坛音频元素，跳过初始化。");
+        return; 
+    }
+    
+    const btn = document.getElementById('forumMiniPlayBtn');
+    const actionText = document.getElementById('forumActionText');
+    const playerContainer = document.getElementById('forumVinylPlayer');
+    if (!FORUM_AUDIO_SRC) { if(playerContainer) playerContainer.style.opacity = '0.4'; return; }
+    
+    sourceEl.src = FORUM_AUDIO_SRC;
+    audio.load(); audio.volume = 0.3;
+    btn.addEventListener('click', () => {
+        if (audio.paused) {
+            audio.play().then(() => {
+                playerContainer.classList.add('playing'); actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸';
+            }).catch(() => {});
+        } else {
+            audio.pause(); playerContainer.classList.remove('playing'); actionText.textContent = '[ 暂停 ]'; btn.textContent = '▶';
+        }
+    });
 }
 
+function setupMiniTerminalPlayer() {
+    const audio = document.getElementById('bgAudio');
+    const sourceEl = document.getElementById('audioSource');
+    const btn = document.getElementById('miniPlayBtn');
+    const actionText = document.getElementById('actionText');
+    const playerContainer = document.getElementById('vinylPlayer');
+    if (!audio || !sourceEl || !btn || !playerContainer) {
+        console.warn('未找到终端音频元素，跳过初始化。');
+        return;
+    }
+    if (!TERMINAL_AUDIO_SRC) { playerContainer.style.opacity = '0.4'; return; }
+    sourceEl.src = TERMINAL_AUDIO_SRC;
+    audio.load(); audio.volume = 0.3;
+    btn.addEventListener('click', () => {
+        if (audio.paused) {
+            audio.play().then(() => {
+                playerContainer.classList.add('playing'); if (actionText) actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸';
+            }).catch(() => {});
+        } else {
+            audio.pause(); playerContainer.classList.remove('playing'); if (actionText) actionText.textContent = '[ 暂停 ]'; btn.textContent = '▶';
+        }
+    });
+}
+
+// ============ 论坛渲染 ============
+function renderFeaturedPosts() {
+    const slider = document.getElementById('featuredSlider');
+    if (!slider) return;
+
+    const validFeatured = featuredPosts.filter(item => item && (item.postId || item.id));
+    slider.innerHTML = validFeatured.map(item => {
+        const targetId = item.postId || item.id;
+        const match = forumPosts.find(post => post.id === targetId);
+        const title = match ? match.title : (item.title || '专题');
+        const imagePath = item.image || 'images/feature1.jpg';
+        return `
+            <div class="featured-post-card featured-link" data-id="${targetId}" style="background-color:#222; background-image:url('${imagePath}')">
+                <span class="featured-post-badge">${item.badge || '专题'}</span>
+                <div class="featured-post-title">${title}</div>
+            </div>
+        `;
+    }).join('');
+
+    document.querySelectorAll('.featured-link').forEach(el => {
+        el.addEventListener('click', function() {
+            const targetId = this.dataset.id;
+            if (!targetId) return;
+            const target = forumPosts.find(post => post.id === targetId);
+            if (target) {
+                showPostDetail(targetId);
+            }
+        });
+    });
+}
+
+function renderPostList() {
+    const list = document.getElementById('postList');
+    if (!list) return;
+    let filtered = forumPosts;
+    if (currentBoard !== 'all') filtered = filtered.filter(p => p.board === currentBoard);
+    if (!filtered || filtered.length === 0) {
+        list.innerHTML = `<div class="post-item" style="text-align:center;color:var(--text-muted);pointer-events:none;border-color:transparent;">该板块还没有帖子，快来发布第一篇讨论吧。</div>`;
+    } else {
+        list.innerHTML = filtered.slice().reverse().map(p => {
+            const cover = p.image && String(p.image).trim() ? String(p.image).trim() : 'images/feature1.jpg';
+            return `
+            <div class="post-item" data-id="${p.id}">
+                ${p.image ? `<div class="post-cover" style="background-image:url('${cover}')"></div>` : ''}
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-author">${p.author}</div>
+                        <div class="post-meta">
+                            <span class="post-board-tag">${p.board || '综合'}</span>
+                            <span class="post-time">${p.timestamp}</span>
+                        </div>
+                    </div>
+                    <div class="post-title">${p.title}</div>
+                    <div class="post-content-preview">${p.content}</div>
+                </div>
+            </div>
+        `}).join('');
+    }
+    document.querySelectorAll('.post-item[data-id]').forEach(el => {
+        el.addEventListener('click', () => showPostDetail(el.dataset.id));
+    });
+    document.getElementById('totalPosts').textContent = forumPosts.length;
+    renderBoardStats();
+    renderCheckin();
+}
+
+// ============ 每日签到 ============
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function yesterdayStr() {
+    const d = new Date(); d.setDate(d.getDate()-1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function renderCheckin() {
+    const btn = document.getElementById('checkinBtn');
+    if (!btn) return;
+    const today = todayStr();
+    const checkedToday = checkinState.lastDate === today;
+    btn.textContent = checkedToday ? '✅ 今日已签到' : '☾ 今日签到';
+    btn.disabled = checkedToday;
+    btn.classList.toggle('done', checkedToday);
+    document.getElementById('checkinStreak').textContent = `连签 ${checkinState.streak} 天`;
+    document.getElementById('checkinPoints').textContent = checkinState.points;
+    const level = Math.min(10, Math.floor(checkinState.total / 5) + 1);
+    document.getElementById('checkinLevel').textContent = `Lv.${level}`;
+    document.getElementById('checkinTip').textContent = checkedToday
+        ? '明天再来，连续签到奖励更多'
+        : (checkinState.lastDate === yesterdayStr() ? '昨天已签，今天续上可保持连签' : '签到可得积分，连续签到奖励更多');
+}
+function doCheckin() {
+    const today = todayStr();
+    const yst = yesterdayStr();
+    if (checkinState.lastDate === today) { renderCheckin(); return; }
+    if (checkinState.lastDate === yst) {
+        checkinState.streak += 1;
+    } else {
+        checkinState.streak = 1;
+    }
+    checkinState.total += 1;
+    checkinState.points += 10 + Math.min(20, (checkinState.streak - 1) * 2);
+    checkinState.lastDate = today;
+    checkinState.dates = checkinState.dates || [];
+    checkinState.dates.push(today);
+    safeSet('darkalley_checkin', checkinState);
+    renderCheckin();
+    const gained = 10 + Math.min(20, (checkinState.streak - 1) * 2);
+    alert(`☾ 签到成功！\n连签 ${checkinState.streak} 天\n积分 +${gained}（当前 ${checkinState.points}）`);
+}
+if (document.getElementById('checkinBtn')) {
+    document.getElementById('checkinBtn').addEventListener('click', doCheckin);
+}
+
+function renderBoardStats() {
+    const statsEl = document.getElementById('boardStats');
+    if (!statsEl) return;
+    const boards = [
+        { name: '灵异见闻', icon: '👁️', desc: '怪事目击' },
+        { name: '巷中秘闻', icon: '🌫️', desc: '巷间怪谈' },
+        { name: '求助解惑', icon: '🕯️', desc: '遇事问询' },
+        { name: '民俗考据', icon: '📜', desc: '民间志异' },
+    ];
+    statsEl.innerHTML = boards.map(b => {
+        const count = forumPosts.filter(p => p.board === b.name).length;
+        return `<li data-board="${b.name}">
+            <span class="board-ico">${b.icon}</span>
+            <span class="board-name">${b.name}<small>${b.desc}</small></span>
+            <span class="stat-num">${count}</span>
+        </li>`;
+    }).join('');
+    // 侧边栏板块导航可点击，切换到对应板块
+    statsEl.querySelectorAll('li[data-board]').forEach(li => {
+        li.addEventListener('click', () => {
+            const board = li.dataset.board;
+            const tab = document.querySelector(`.board-tab[data-board="${board}"]`);
+            if (tab) {
+                document.querySelectorAll('.board-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentBoard = board;
+                renderPostList();
+            }
+        });
+    });
+}
+
+function bindHomeNoticeActions() {
+    document.querySelectorAll('.notice-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const target = card.dataset.target;
+            const category = card.dataset.category || 'all';
+            if (target === 'monitor') {
+                switchPanel('monitor');
+                initMap();
+                return;
+            }
+            if (target === 'archive') {
+                switchPanel('archive');
+                activeCategory = category;
+                document.querySelectorAll('.cat-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.category === activeCategory));
+                renderArchiveList();
+                return;
+            }
+            if (target === 'commBoard') {
+                switchPanel('commBoard');
+                renderCommBoard();
+                return;
+            }
+            if (target === 'containment') {
+                switchPanel('containment');
+                renderContainmentList();
+                return;
+            }
+            if (target === 'lingshi') {
+                switchPanel('lingshi');
+                renderLingshi();
+                return;
+            }
+        });
+    });
+}
+
+window.showPostDetail = function(id) {
+    const post = forumPosts.find(p => p.id === id);
+    if (!post) {
+        console.warn('未找到帖子：', id);
+        return;
+    }
+    document.getElementById('postListView').style.display = 'none';
+    document.getElementById('newPostForm').style.display = 'none';
+    document.getElementById('forumProfileView').style.display = 'none';
+    const detail = document.getElementById('postDetailView');
+    detail.style.display = 'block';
+    detail.dataset.currentId = id;
+    // 打开帖子详情时锁定外层滚动，避免穿透误触
+    document.body.style.overflow = 'hidden';
+
+    const bodyHtml = post.content
+        .split('\n\n')
+        .map(paragraph => paragraph.trim())
+        .filter(Boolean)
+        .map(p => {
+            const isList = p.startsWith('1.') || p.startsWith('2.') || p.startsWith('3.') || p.startsWith('4.') || p.startsWith('5.') || p.startsWith('·');
+            if (isList) {
+                const items = p
+                    .split(/\n/)
+                    .map(item => item.trim())
+                    .filter(Boolean)
+                    .map(item => `<li>${item.replace(/^\d+\.?\s*|^·\s*/, '')}</li>`)
+                    .join('');
+                return `<ul class="detail-list">${items}</ul>`;
+            }
+            return `<p>${p}</p>`;
+        })
+        .join('');
+
+    const detailCover = post.image && String(post.image).trim() ? String(post.image).trim() : '';
+    const commentCount = (post.comments||[]).length;
+    document.getElementById('postDetailContent').innerHTML = `
+        ${detailCover ? `<div class="post-detail-cover" style="background-image:url('${detailCover}')"></div>` : ''}
+        <div class="post-detail-header">
+            <div class="post-author-bar">
+                <div class="thread-avatar op tone-a">${(post.author||'匿').slice(-2).slice(0,1)}</div>
+                <div>
+                    <div class="post-author-name">${post.author}<span class="op-badge">楼主</span></div>
+                    <div class="post-detail-meta">
+                        <span>${post.timestamp}</span>
+                        <span class="post-board-tag">${post.board || '综合'}</span>
+                        <span class="post-stat">👁 ${(post.views||0)} 浏览 · 💬 ${commentCount} 回复</span>
+                    </div>
+                </div>
+            </div>
+            <h2>${post.title}</h2>
+        </div>
+        <div class="post-detail-body">
+            ${bodyHtml}
+        </div>`;
+    renderComments(post);
+}
+
+function renderComments(post) {
+    const opName = post.author;
+    document.getElementById('commentList').innerHTML = (post.comments||[]).map((c, idx) => {
+        const isOP = !!c.isOP || c.user === opName;
+        const opBadge = isOP ? '<span class="op-badge">楼主</span>' : '';
+        const avatarTone = isOP ? 'op' : (idx % 3 === 0 ? 'tone-a' : idx % 3 === 1 ? 'tone-b' : 'tone-c');
+        return `
+        <div class="thread-card${isOP ? ' op-comment' : ''}">
+            <div class="thread-avatar ${avatarTone}">${(c.user||'匿').slice(-2).slice(0,1)}</div>
+            <div class="thread-main">
+                <div class="thread-card-header">
+                    <strong>${c.user}</strong>${opBadge}
+                    <small>${c.time}${c.floor ? ` · ${c.floor}楼` : ''}</small>
+                </div>
+                <p>${c.text}</p>
+            </div>
+        </div>
+    `;
+    }).join('');
+    if (!(post.comments||[]).length) {
+        document.getElementById('commentList').innerHTML = '<div style="color:var(--text-muted);padding:12px 0;">还没有回复，来抢个沙发？</div>';
+    }
+}
+
+function backToList() {
+    document.getElementById('postDetailView').style.display = 'none';
+    document.getElementById('newPostForm').style.display = 'none';
+    document.getElementById('forumProfileView').style.display = 'none';
+    document.getElementById('postListView').style.display = 'block';
+    // 关闭详情时恢复外层滚动
+    document.body.style.overflow = '';
+    renderPostList();
+}
+
+// ============ 论坛事件绑定 ============
+document.querySelectorAll('.board-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.board-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentBoard = tab.dataset.board;
+        renderPostList();
+    });
+});
+document.getElementById('submitNewPostBtn').addEventListener('click', () => {
+    const title = document.getElementById('newPostTitle').value.trim();
+    const content = document.getElementById('newPostContent').value.trim();
+    const board = document.getElementById('newPostBoard').value;
+    if (!title || !content) return alert('请填写标题和内容');
+    forumPosts.push({ id:'p'+Date.now(), title, content, board, author: forumNickname, timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
+    savePosts(); backToList();
+});
+document.getElementById('submitCommentBtn').addEventListener('click', () => {
+    const text = document.getElementById('commentInput').value.trim();
+    if (!text) return;
+    const postId = document.getElementById('postDetailView').dataset.currentId;
+    const post = forumPosts.find(p => p.id === postId);
+    if (!post) return;
+    post.comments.push({ user: forumNickname, text, time:new Date().toLocaleString('zh-CN') });
+    savePosts(); renderComments(post); document.getElementById('commentInput').value = '';
+});
+['forumHomeLink','backToListBtn','cancelNewPostBtn','profileBackBtn'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.addEventListener('click', (e) => { if(e) e.preventDefault(); backToList(); });
+});
+document.getElementById('forumNewPostLink').addEventListener('click', e => { e.preventDefault();
+    document.getElementById('postListView').style.display = 'none';
+    document.getElementById('postDetailView').style.display = 'none';
+    document.getElementById('forumProfileView').style.display = 'none';
+    document.getElementById('newPostForm').style.display = 'block';
+});
+
+// ============ 论坛个人中心与登录系统 ============
+document.getElementById('forumProfileLink').addEventListener('click', e => { e.preventDefault(); backToProfile(); });
+function backToProfile() {
+    document.getElementById('postListView').style.display = 'none';
+    document.getElementById('postDetailView').style.display = 'none';
+    document.getElementById('newPostForm').style.display = 'none';
+    document.getElementById('forumProfileView').style.display = 'block';
+    renderForumProfile();
+}
+function renderForumProfile() {
+    document.getElementById('forumProfileName').textContent = forumNickname;
+    const level = Math.min(10, Math.floor(checkinState.total / 5) + 1);
+    document.getElementById('forumProfileSub').textContent = `已签到 ${checkinState.total} 天 · Lv.${level}`;
+    // 概览
+    const myPostCount = forumPosts.filter(p => p.author === forumNickname).length;
+    document.getElementById('ovPosts').textContent = myPostCount;
+    document.getElementById('ovCheckin').textContent = checkinState.total;
+    document.getElementById('ovStreak').textContent = checkinState.streak;
+    document.getElementById('ovPoints').textContent = checkinState.points;
+    // 我的帖子
+    const mine = forumPosts.filter(p => p.author === forumNickname);
+    document.getElementById('mypostsList').innerHTML = mine.length ? mine.map(p => `
+        <div class="my-post-item">
+            <span class="my-post-board">${p.board || '综合'}</span>
+            <span class="my-post-title" onclick="showPostDetail('${p.id}')">${p.title}</span>
+            <small>${(p.comments||[]).length} 回复 · ${p.timestamp}</small>
+        </div>`).join('') : '<div style="color:var(--text-muted);padding:10px 0;">你还没有发过帖子</div>';
+    // 签到记录
+    const history = (checkinState.dates || []).slice().reverse();
+    document.getElementById('checkinHistory').innerHTML = history.length ? history.map(d => `<div class="checkin-day"><span>☾</span><span>${d}</span><span class="checkin-day-ok">已签到</span></div>`).join('') : '<div style="color:var(--text-muted);padding:10px 0;">还没有签到记录</div>';
+    // 好友
+    document.getElementById('friendsList').innerHTML = forumFriends.length ? forumFriends.map(f => `<div class="friend-item" style="border-bottom:1px solid var(--border-color);padding:8px 0;display:flex;justify-content:space-between;"><span>${f}</span><button onclick="removeFriend('${f}')" style="color:var(--accent-red);">删除</button></div>`).join('') : '暂无好友';
+    // 私信
+    document.getElementById('messagesList').innerHTML = forumMessages.length ? forumMessages.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--border-color);"><strong>${m.from}</strong> → ${m.to}: ${m.text} <small style="color:var(--text-muted);">${m.time}</small></div>`).join('') : '暂无消息';
+}
+window.removeFriend = function(name) { forumFriends = forumFriends.filter(f => f !== name); safeSet('darkalley_friends', forumFriends); renderForumProfile(); };
+document.getElementById('addFriendBtn').addEventListener('click', () => { const name = safePrompt('输入好友昵称：'); if (name && name.trim() && !forumFriends.includes(name.trim())) { forumFriends.push(name.trim()); safeSet('darkalley_friends', forumFriends); renderForumProfile(); } });
+document.getElementById('sendMessageBtn').addEventListener('click', () => { const to = document.getElementById('messageRecipient').value.trim(); const text = document.getElementById('messageContent').value.trim(); if (!to || !text) return alert('请填写收件人和内容'); forumMessages.push({ from: forumNickname, to, text, time:new Date().toLocaleString('zh-CN') }); safeSet('darkalley_messages', forumMessages); renderForumProfile(); });
+document.querySelectorAll('.profile-tab').forEach(tab => { tab.addEventListener('click', () => { document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); const t = tab.dataset.tab; ['overview','myposts','checkin','friends','messages'].forEach(k => { const el = document.getElementById(k + 'Panel'); if (el) el.style.display = k === t ? 'block' : 'none'; }); if (t === 'myposts' || t === 'checkin' || t === 'overview') renderForumProfile(); }); });
+const quickCheckinBtn = document.getElementById('quickCheckinBtn');
+if (quickCheckinBtn) quickCheckinBtn.addEventListener('click', () => { doCheckin(); renderForumProfile(); });
+const quickNewPostBtn = document.getElementById('quickNewPostBtn');
+if (quickNewPostBtn) quickNewPostBtn.addEventListener('click', () => { document.getElementById('forumProfileView').style.display = 'none'; document.getElementById('postListView').style.display = 'none'; document.getElementById('postDetailView').style.display = 'none'; document.getElementById('newPostForm').style.display = 'block'; });
+
+// ============ 🚀【核心修复】管理员登录状态同步与管理按钮显示 ============
+function updatePortalStatus() {
+    if (window.currentUser) {
+        document.getElementById('topUsername').textContent = window.currentUser.name;
+        if (window.currentUser.isAdmin) {
+            // 显示 [管理员] 标签
+            document.getElementById('topAdminBadge').style.display = 'inline';
+            // 🛠️ 修复：必须把 admin-only 按钮的 display 属性改掉，否则菜单里永远不会有【管理】
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = 'inline-block';
+            });
+        } else {
+            document.getElementById('topAdminBadge').style.display = 'none';
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+    } else {
+        document.getElementById('topUsername').textContent = '---';
+        document.getElementById('topAdminBadge').style.display = 'none';
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
+}
+
+function attemptLogin() {
+    const id = document.getElementById('staffIdInput').value.trim(); const pass = document.getElementById('passwordInput').value.trim(); const info = VALID_USERS[id];
+    if (!info || info.pass !== pass) { document.getElementById('loginError').textContent = '[!] 验证失败'; return; }
+    window.currentUser = { id, name:info.name, isAdmin:info.isAdmin };
+    userLoginCounts[id] = (userLoginCounts[id] || 0) + 1; safeSet('xuju_logincounts', userLoginCounts);
+    if (!userFavorites[id]) userFavorites[id] = []; if (!userHistory[id]) userHistory[id] = [];
+    document.getElementById('awakenModal').style.display = 'none';
+    showTerminalLoading(() => {
+        document.getElementById('forumContainer').style.display = 'none'; document.getElementById('terminalContainer').style.display = 'block';
+        if(!terminalInited) { setTimeout(initTerminal, 300); }
+        updatePortalStatus(); setupMiniTerminalPlayer();
+    });
+}
+function logoutTerminal() { window.currentUser = null; document.getElementById('terminalContainer').style.display = 'none'; document.getElementById('forumContainer').style.display = 'block'; updatePortalStatus(); }
 document.getElementById('loginBtn').addEventListener('click', attemptLogin);
 document.getElementById('passwordInput').addEventListener('keypress', e => { if(e.key==='Enter') attemptLogin(); });
 document.getElementById('logoutTopBtn').addEventListener('click', logoutTerminal);
-function openAwakenModal() {
-    document.getElementById('awakenModal').style.display = 'flex';
-    document.getElementById('staffIdInput').focus();
-}
-['awakenEntryBtn','awakenEntryFooter'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('click', e => { e.preventDefault(); openAwakenModal(); });
-});
-document.getElementById('closeAwakenModalBtn').addEventListener('click', () => {
-    document.getElementById('awakenModal').style.display = 'none';
-});
+function openAwakenModal() { document.getElementById('awakenModal').style.display = 'flex'; document.getElementById('staffIdInput').focus(); }
+['awakenEntryBtn','awakenEntryFooter'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('click', e => { e.preventDefault(); openAwakenModal(); }); });
+document.getElementById('closeAwakenModalBtn').addEventListener('click', () => document.getElementById('awakenModal').style.display = 'none');
 
-// ============ 终端 ============
-let terminalInited = false;
+function showTerminalLoading(callback) {
+    const loader = document.getElementById('terminalLoading');
+    if (!loader) { if (callback) callback(); return; }
+    const bar = document.getElementById('loadingBar'); const percentText = document.getElementById('percentText');
+    loader.style.display = 'flex'; bar.style.width = '0%'; let progress = 0;
+    const timer = setInterval(() => {
+        progress += Math.floor(Math.random() * 6) + 4; if (progress > 100) progress = 100;
+        bar.style.width = progress + '%'; percentText.textContent = progress + '%';
+        if (progress >= 100) { clearInterval(timer); setTimeout(() => { loader.style.display = 'none'; if (callback) callback(); }, 500); }
+    }, 180);
+}
+
+// ============ 终端面板逻辑 ============
 function initTerminal() {
     if (terminalInited) return;
-    terminalInited = true;
-    loadArchive();
-    bindTerminalNav();
-    setupAudio();
-    startRain();
-    startTypewriter();
-    renderLingshi();
-    renderInternalPosts();
-    renderMissions();
-    setupEditorEvents();
-    switchPanel('home');
-    updateProfilePanel();
+    terminalInited = true; loadArchive(); saveLocalDataBundle(); bindTerminalNav(); startRain();
+    startTypewriter(); renderLingshi(); renderInternalPosts(); renderMissions();
+    setupEditorEvents(); bindHomeNoticeActions(); switchPanel('home'); updateProfilePanel();
+    document.getElementById('terminalFortuneText').textContent = getDailyFortune();
 }
-
-function switchPanel(name) {
+window.switchPanel = function(name) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     const panel = document.getElementById(name + 'Panel');
     if (panel) panel.classList.add('active');
@@ -240,631 +672,522 @@ function switchPanel(name) {
     const btn = document.querySelector(`.nav-btn[data-panel="${name}"]`);
     if (btn) btn.classList.add('active');
     currentPanel = name;
-    if (name === 'archive') renderArchiveList();
+    if (name === 'archive') {
+        if (!Array.isArray(archiveData) || archiveData.length === 0) {
+            loadArchive();
+        }
+        renderArchiveList();
+    }
     if (name === 'admin') renderAdminList();
     if (name === 'profile') updateProfilePanel();
     if (name === 'lingshi') renderLingshi();
     if (name === 'internalForum') renderInternalPosts();
     if (name === 'missions') renderMissions();
+    if (name === 'monitor') initMap();
+    if (name === 'containment') renderContainmentList();
+    if (name === 'commBoard') renderCommBoard();
 }
-
 function bindTerminalNav() {
-    document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => {
-        btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
-    });
-    document.querySelectorAll('.index-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const cat = card.dataset.cat;
-            const tab = document.querySelector(`.cat-tab[data-category="${cat}"]`);
-            if (tab) { tab.click(); switchPanel('archive'); }
-        });
-    });
-    document.querySelectorAll('.cat-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            activeCategory = tab.dataset.category;
-            renderArchiveList();
-        });
-    });
+    document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => btn.addEventListener('click', () => switchPanel(btn.dataset.panel)));
+    document.querySelectorAll('.index-card').forEach(card => card.addEventListener('click', () => { const cat = card.dataset.cat; const tab = document.querySelector(`.cat-tab[data-category="${cat}"]`); if (tab) { tab.click(); switchPanel('archive'); } }));
+    document.querySelectorAll('.cat-tab').forEach(tab => tab.addEventListener('click', () => {
+        document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        activeCategory = tab.dataset.category || 'all';
+        activeSubCategory = 'all';
+        renderArchiveList();
+    }));
     document.getElementById('archiveSearchInput').addEventListener('input', renderArchiveList);
 }
 
-// 档案
+// ============ 档案检索、收容物、通讯等 ============
 function loadArchive() {
     const saved = safeGetJSON('xuju_archive', null);
-    archiveData = (saved && Array.isArray(saved) && saved.length > 0) ? saved : JSON.parse(JSON.stringify(DEFAULT_ARCHIVES));
+    const validCategories = new Set(['墟界管理档案', '叛逃人员档案', '人物档案', '事件分支', '收容物分支']);
+    const normalizeArchiveItem = item => {
+        if (!item || typeof item !== 'object') return null;
+        const category = String(item.category || '');
+        const keyCategory = category === '档案条例' || category === '墟界管理档案' ? '墟界管理档案'
+            : category === '人物' || category === '人物档案' ? '人物档案'
+            : category === '叛逃人员' || category === '叛逃人员档案' ? '叛逃人员档案'
+            : category === '事件' || category === '事件分支' ? '事件分支'
+            : category === '收容物' || category === '收容物分支' ? '收容物分支'
+            : category;
+        const normalized = { ...item, category: keyCategory };
+        if (normalized.title && /^档案条例\s*·|^总则分支\s*·|^机制分支\s*·/.test(normalized.title)) {
+            normalized.title = normalized.title.replace(/^档案条例\s*·/, '墟界管理档案 ·').replace(/^总则分支\s*·/, '墟界管理档案 · 总则分支 ·').replace(/^机制分支\s*·/, '墟界管理档案 · 机制分支 ·');
+        }
+        if (normalized.title && /^人物档案\s*·/.test(normalized.title) && normalized.category === '人物档案') {
+            normalized.title = normalized.title.replace(/^人物档案\s*·/, '人物档案 ·');
+        }
+        if (normalized.title && /^(人物档案|档案条例|事件分支|收容物分支)/.test(normalized.title) && !validCategories.has(normalized.category)) {
+            normalized.category = validCategories.has(normalized.category) ? normalized.category : '墟界管理档案';
+        }
+        return normalized;
+    };
+    const normalizedSaved = Array.isArray(saved) ? saved.map(normalizeArchiveItem).filter(Boolean) : [];
+    const archiveIsClean = normalizedSaved.length > 0 && normalizedSaved.every(item => {
+        if (!item || typeof item !== 'object') return false;
+        if (!validCategories.has(item.category) || !item.title || !item.summary || !item.content) return false;
+        const content = String(item.content || '');
+        return !/(正文内容|整理自|\.docx)/i.test(content);
+    });
+    archiveData = archiveIsClean ? normalizedSaved : JSON.parse(JSON.stringify(DEFAULT_ARCHIVES));
+    // 补全元数据：即使是从旧缓存读取的数据，也确保 image / subCategory / subtitle 与图片联动正确
+    archiveData.forEach(item => {
+        if (!item) return;
+        const inferredImage = inferArchiveImage(item.title, item.category);
+        const inferredSub = inferArchiveSubCategory(item.title, item.category);
+        const inferredSubtitle = inferArchiveSubtitle(item.title, item.category, item.content || '');
+        item.image = item.image || inferredImage;
+        item.subCategory = item.subCategory || inferredSub;
+        item.subtitle = item.subtitle || inferredSubtitle;
+        if (item.category === '人物档案' && !item.image.includes('.')) {
+            item.image = 'images/default-archive.jpg';
+        }
+    });
     safeSet('xuju_archive', archiveData);
+    safeSet('site_local_data_bundle', { exportAt: new Date().toISOString(), archiveData, forumPosts, featuredPosts });
 }
+function buildArchiveTree(items) {
+    const tree = {};
+
+    items.forEach(item => {
+        const title = String(item.title || '');
+        const parts = title.split(/\s*·\s*/).map(part => part.trim()).filter(Boolean);
+        const docName = item.category || parts[0] || '未知档案';
+        const chapterName = parts.length > 1 ? parts[1] : '总目录';
+        const subName = parts.length > 2 ? parts.slice(2).join(' · ') : null;
+
+        if (!tree[docName]) tree[docName] = {};
+        if (!tree[docName][chapterName]) {
+            tree[docName][chapterName] = { title: chapterName, items: [], children: {} };
+        }
+
+        const chapterBucket = tree[docName][chapterName];
+        if (subName) {
+            if (!chapterBucket.children[subName]) {
+                chapterBucket.children[subName] = { title: subName, items: [] };
+            }
+            chapterBucket.children[subName].items.push(item);
+        } else {
+            chapterBucket.items.push(item);
+        }
+    });
+
+    return tree;
+}
+
+function renderArchiveNodeItems(items, container) {
+    items.forEach(item => {
+        const node = document.createElement('div');
+        node.className = 'archive-node';
+        node.innerHTML = `
+            <div class="archive-node-index">${item.id}</div>
+            <div class="archive-node-main">
+                <div class="archive-node-title">${item.title}</div>
+                <div class="archive-node-summary">${item.summary}</div>
+            </div>
+        `;
+        node.addEventListener('click', () => openArchiveDetail(item));
+        container.appendChild(node);
+    });
+}
+
 function renderArchiveList() {
-    const keyword = document.getElementById('archiveSearchInput').value.trim().toLowerCase();
-    let filtered = archiveData;
-    if (activeCategory !== 'all') filtered = filtered.filter(i => i.category === activeCategory);
-    if (keyword) filtered = filtered.filter(i => (i.id+i.title+i.tags.join(' ')+i.summary+i.content).toLowerCase().includes(keyword));
-    const list = document.getElementById('archiveList');
-    list.innerHTML = '';
+    if (!Array.isArray(archiveData) || archiveData.length === 0) {
+        loadArchive();
+    }
+    const searchInput = document.getElementById('archiveSearchInput');
+    const container = document.getElementById('archiveContainer');
+    if (!searchInput || !container) return;
+
+    const keyword = searchInput.value.trim().toLowerCase();
+    let filtered = [...archiveData];
+
+    if (activeCategory !== 'all') {
+        filtered = filtered.filter(item => item.category === activeCategory);
+    }
+
+    if (activeSubCategory && activeSubCategory !== 'all') {
+        filtered = filtered.filter(item => (item.subCategory || '概览') === activeSubCategory);
+    }
+
+    if (keyword) {
+        filtered = filtered.filter(item => {
+            const searchable = `${item.id} ${item.title} ${(item.tags || []).join(' ')} ${(item.summary || '')} ${(item.subtitle || '')} ${(item.content || '')}`.toLowerCase();
+            return searchable.includes(keyword);
+        });
+    }
+
+    let sidebar = document.getElementById('archiveSidebar');
+    if (!sidebar) {
+        sidebar = document.createElement('div');
+        sidebar.id = 'archiveSidebar';
+        sidebar.className = 'archive-sidebar';
+        container.appendChild(sidebar);
+    }
+
+    let grid = document.getElementById('archiveGrid');
+    if (!grid) {
+        grid = document.createElement('div');
+        grid.id = 'archiveGrid';
+        grid.className = 'archive-grid';
+        container.appendChild(grid);
+    }
+
+    container.innerHTML = '';
+    container.appendChild(sidebar);
+    container.appendChild(grid);
+
+    sidebar.innerHTML = '';
+    grid.innerHTML = '';
+
+    const categories = Array.from(new Set((archiveData || []).map(item => item.category).filter(Boolean))).sort((a, b) => {
+        const order = ['墟界管理档案', '叛逃人员档案', '人物档案', '事件分支', '收容物分支'];
+        return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b));
+    });
+
+    categories.forEach(category => {
+        // 数字用全量档案统计，不受当前搜索/分类过滤影响
+        const totalCount = (archiveData || []).filter(item => item.category === category).length;
+        const group = document.createElement('div');
+        group.className = 'archive-nav-group';
+
+        const categoryBtn = document.createElement('div');
+        categoryBtn.className = 'archive-nav-item' + (activeCategory === category ? ' active' : '');
+        categoryBtn.innerHTML = `<span class="archive-nav-cat">${category}</span><span class="archive-nav-count">${totalCount}</span>`;
+        categoryBtn.addEventListener('click', () => {
+            activeCategory = category;
+            activeSubCategory = 'all';
+            document.querySelectorAll('.cat-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.category === category));
+            renderArchiveList();
+        });
+
+        const subList = document.createElement('div');
+        subList.className = 'archive-nav-sublist';
+        // 子分类基于该分类全部档案计算，避免被其他分类过滤影响
+        const categoryAll = (archiveData || []).filter(item => item.category === category);
+        const subOptions = Array.from(new Set(categoryAll.map(item => item.subCategory || '概览').filter(Boolean))).sort();
+
+        if (subOptions.length) {
+            subOptions.forEach(sub => {
+                const subBtn = document.createElement('div');
+                subBtn.className = 'archive-nav-subitem' + ((activeCategory === category && activeSubCategory === sub) ? ' active' : '');
+                const subCount = categoryAll.filter(item => (item.subCategory || '概览') === sub).length;
+                subBtn.innerHTML = `<span>${sub}</span><span class="archive-nav-count">${subCount}</span>`;
+                subBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    activeCategory = category;
+                    activeSubCategory = sub;
+                    document.querySelectorAll('.cat-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.category === category));
+                    renderArchiveList();
+                });
+                subList.appendChild(subBtn);
+            });
+        }
+
+        group.appendChild(categoryBtn);
+        if (activeCategory === category) {
+            group.appendChild(subList);
+        }
+
+        sidebar.appendChild(group);
+    });
+
     if (!filtered.length) {
-        list.innerHTML = '<div class="archive-card" style="text-align:center;color:#ff3333;">[!] 无结果</div>';
+        grid.innerHTML = '<div class="archive-card" style="text-align:center;color:var(--text-muted);padding:20px;">没有匹配的档案。</div>';
         return;
     }
+
     filtered.forEach(item => {
         const card = document.createElement('div');
-        card.className = 'archive-card';
-        card.innerHTML = `
-            <div class="card-header"><span class="card-id">${item.id}</span><span class="card-category">${item.category}</span></div>
-            <div class="card-title">${item.title}</div>
-            <div class="card-summary">${item.summary}</div>
-            <div class="card-actions"><button class="fav-btn" data-id="${item.id}">⭐ 收藏</button><button class="view-detail-btn">📄 查看详情</button></div>`;
-        card.querySelector('.view-detail-btn').addEventListener('click', e => { e.stopPropagation(); openArchiveDetail(item); });
+        card.className = 'archive-card-item';
         card.addEventListener('click', () => openArchiveDetail(item));
-        card.querySelector('.fav-btn').addEventListener('click', e => { e.stopPropagation(); toggleFavorite(item.id); renderArchiveList(); });
-        list.appendChild(card);
+
+        const image = item.image && String(item.image).trim() ? String(item.image).trim() : 'images/default-archive.jpg';
+        const tags = Array.isArray(item.tags) ? item.tags.slice(0, 3) : [item.subCategory || '档案'];
+
+        card.innerHTML = `
+            <img class="archive-card-img" src="${image}" alt="${item.title}" onerror="this.src='images/default-archive.jpg'">
+            <div class="archive-card-body">
+                <div class="archive-card-title">${item.title}</div>
+                <div class="archive-card-summary">${item.summary || ''}</div>
+                <div class="archive-card-tags">
+                    ${(tags || []).map(tag => `<span class="archive-tag">${tag}</span>`).join('')}
+                </div>
+            </div>
+        `;
+
+        grid.appendChild(card);
     });
 }
+
 function openArchiveDetail(item) {
     addHistory(item.id);
     const modal = document.getElementById('archiveDetailModal');
     const content = document.getElementById('archiveDetailContent');
-    content.innerHTML = `
-        <div class="archive-detail-header"><h2>${item.title}</h2><span class="archive-detail-category">${item.category}</span></div>
-        <div class="archive-detail-body">${item.content}</div>`;
-    modal.style.display = 'flex';
-}
-document.getElementById('closeArchiveDetailBtn').addEventListener('click', () => {
-    document.getElementById('archiveDetailModal').style.display = 'none';
-});
-document.getElementById('archiveDetailModal').addEventListener('click', e => {
-    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
-});
-function addHistory(id) {
-    if (!currentUser) return;
-    const uid = currentUser.id;
-    userHistory[uid] = [id, ...userHistory[uid].filter(x => x !== id)].slice(0, 20);
-    safeSet('xuju_history', userHistory);
-}
-function toggleFavorite(id) {
-    if (!currentUser) return;
-    const uid = currentUser.id;
-    if (!userFavorites[uid]) userFavorites[uid] = [];
-    const idx = userFavorites[uid].indexOf(id);
-    idx > -1 ? userFavorites[uid].splice(idx, 1) : userFavorites[uid].push(id);
-    safeSet('xuju_favs', userFavorites);
-}
+    if (!modal || !content) return;
 
-// 灵犀通讯
+    const imagePath = item.image && String(item.image).trim() ? String(item.image).trim() : 'images/default-archive.jpg';
+    const isPerson = item.category === '人物档案' || /人物档案/.test(item.title || '');
+    const subtitle = item.subtitle || '';
+    const header = isPerson ? `
+        <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border-color);">
+            <img src="${imagePath}" alt="${item.title}" style="width:200px; height:200px; object-fit:cover; border-radius:12px; border:1px solid var(--border-color); background:#111;" onerror="this.src='images/default-archive.jpg'">
+            <div style="flex:1; min-width:0;">
+                <h2 style="color:#fff; margin:0 0 8px;">${item.title}</h2>
+                <div style="color:var(--text-muted); margin-bottom:8px;">${item.category}</div>
+                <div style="color:var(--accent-red); font-weight:700; margin-bottom:6px;">${subtitle || item.subCategory || '档案'}</div>
+                <div style="color:var(--text-secondary); font-size:0.9rem;">编号：${item.id}</div>
+            </div>
+        </div>
+    ` : `
+        <div style="border-bottom:1px solid var(--border-color);padding-bottom:15px;margin-bottom:15px;">
+            <div style="display:flex; align-items:flex-start; gap:16px;">
+                ${item.image ? `<img src="${imagePath}" alt="${item.title}" style="width:200px; height:140px; object-fit:cover; border-radius:10px; border:1px solid var(--border-color); background:#111;" onerror="this.src='images/default-archive.jpg'">` : ''}
+                <div style="flex:1; min-width:0;">
+                    <h2 style="color:#fff; margin:0 0 8px;">${item.title}</h2>
+                    <div style="color:var(--text-muted);">${item.category}</div>
+                    ${item.subtitle ? `<div style="color:var(--accent-red); margin-top:6px; font-weight:700;">${item.subtitle}</div>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+    content.innerHTML = `${header}<div style="line-height:1.7;color:var(--text-secondary);">${item.content}</div>`;
+}
+document.getElementById('closeArchiveDetailBtn').addEventListener('click', () => document.getElementById('archiveDetailModal').style.display = 'none');
+document.getElementById('archiveDetailModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.style.display = 'none'; });
+function addHistory(id) { if (!window.currentUser) return; const uid = window.currentUser.id; userHistory[uid] = [id, ...userHistory[uid].filter(x => x !== id)].slice(0, 20); safeSet('xuju_history', userHistory); }
+
+function renderContainmentList() { const list = document.getElementById('containmentList'); if(!CONTAINMENT_ITEMS || CONTAINMENT_ITEMS.length === 0) { list.innerHTML = '<div>暂无数据。</div>'; return; } list.innerHTML = CONTAINMENT_ITEMS.map(item => ` <div class="archive-card" style="border-left:3px solid var(--accent-red);padding:12px;background:rgba(0,0,0,0.3);margin-bottom:10px;"> <div style="display:flex;justify-content:space-between;"><span style="color:var(--accent-red);">${item.id}</span><span style="color:var(--text-muted);">${item.level}</span></div> <div style="font-weight:bold;margin:4px 0;">${item.name}</div> <div style="color:var(--text-secondary);font-size:0.9rem;">${item.desc}</div> </div> `).join(''); }
+function renderCommBoard() { const list = document.getElementById('commPostList'); if(!INTERNAL_BOARDS || INTERNAL_BOARDS.length === 0) { list.innerHTML = '<div>暂无总局内部通讯。</div>'; return; } list.innerHTML = INTERNAL_BOARDS.map(item => ` <div style="padding:12px;border-bottom:1px solid var(--border-color);"> <div style="font-weight:bold;">📌 ${item.title}</div> <div style="color:var(--text-secondary);font-size:0.9rem;margin:6px 0;padding:6px 0;border-bottom:1px solid var(--border-color);">${item.content}</div> <div style="color:var(--accent-red);font-family:'Comic Sans MS',cursive;font-size:0.95rem;border-left:3px solid var(--accent-red);padding-left:10px;">✍ 【批注】${item.comment}</div> </div> `).join(''); }
+function renderInternalPosts() { document.getElementById('internalPostList').innerHTML = internalPosts.slice().reverse().map(p => `<div class="admin-item" style="padding:10px;border-bottom:1px solid var(--border-color);"><span>${p.title}</span><small style="color:var(--text-muted);">${p.author}</small><button onclick="showInternalPostDetail('${p.id}')" style="color:var(--accent-red);float:right;border:1px solid var(--border-color);padding:2px 8px;">查看</button></div>`).join(''); }
+window.showInternalPostDetail = function(id) { currentInternalPostId = id; const post = internalPosts.find(p => p.id === id); if (!post) return; document.getElementById('internalPostList').style.display = 'none'; document.getElementById('internalPostDetail').style.display = 'block'; document.getElementById('internalPostContent').innerHTML = `<h3>${post.title}</h3><div style="color:var(--text-muted);font-size:0.8rem;">${post.author} · ${post.timestamp}</div><p style="margin:15px 0;">${post.content}</p>${(post.comments||[]).map(c => `<div style="border-top:1px solid var(--border-color);padding:10px 0;"><strong>${c.user}</strong>: ${c.text}</div>`).join('')}`; };
+document.getElementById('internalBackBtn').addEventListener('click', () => { document.getElementById('internalPostDetail').style.display = 'none'; document.getElementById('internalPostList').style.display = 'grid'; renderInternalPosts(); });
+document.getElementById('internalNewPostBtn').addEventListener('click', () => { const title = safePrompt('标题：'); if (!title || !title.trim()) return; const content = safePrompt('内容：'); if (!content || !content.trim()) return; internalPosts.push({ id:'ip'+Date.now(), title: title.trim(), content: content.trim(), author: window.currentUser ? window.currentUser.name : '匿名', timestamp:new Date().toLocaleString('zh-CN'), comments:[] }); safeSet('xuju_internal_posts', internalPosts); renderInternalPosts(); });
+document.getElementById('internalCommentBtn').addEventListener('click', () => { const text = document.getElementById('internalCommentInput').value.trim(); if (!text) return; const post = internalPosts.find(p => p.id === currentInternalPostId); if (!post) return; post.comments.push({ user: window.currentUser ? window.currentUser.name : '匿名', text, time:new Date().toLocaleString('zh-CN') }); safeSet('xuju_internal_posts', internalPosts); window.showInternalPostDetail(currentInternalPostId); });
+
+function renderMissions() {
+    document.getElementById('missionsList').innerHTML = missions.map(m => `
+        <div class="mission-item">
+            <div class="mission-head">
+                <div class="mission-title">${m.title}</div>
+                <span class="mission-status">${m.status}</span>
+            </div>
+            <div class="mission-meta"><span class="mission-tag">${m.risk}</span>截止：${m.deadline}</div>
+            <div class="mission-desc">${m.desc}</div>
+        </div>
+    `).join('');
+}
 function renderLingshi() {
+    const channelMap = {
+        main: '总局',
+        club: '民俗社',
+        operation: '外勤'
+    };
     const msgs = lingshiMessages[currentChannel] || [];
-    const container = document.getElementById('lingshiMessages');
-    if (container) container.innerHTML = msgs.map(m => `<div class="lingshi-msg"><div class="lingshi-msg-user">${m.user} · ${m.time}</div><div class="lingshi-msg-text">${m.text}</div></div>`).join('');
-    const nameEl = document.getElementById('currentChannelName');
-    if (nameEl) nameEl.textContent = '#' + (currentChannel === 'main' ? '总局频道' : currentChannel === 'club' ? '民俗社五人' : currentChannel === 'operation' ? '外勤行动' : '档案室');
+    document.querySelector('.lingshi-header').textContent = `# ${channelMap[currentChannel] || '总局'}`;
+    document.getElementById('lingshiMessages').innerHTML = msgs.length
+        ? msgs.map(m => `
+            <div class="lingshi-message-item">
+                <div class="lingshi-message-head">
+                    <strong>${m.user}</strong>
+                    <span>${m.time}</span>
+                </div>
+                <p>${m.text}</p>
+            </div>
+        `).join('')
+        : `<div class="lingshi-message-item"><div class="lingshi-message-head"><strong>系统</strong><span>--</span></div><p>该频道尚无消息，先发一条记录吧。</p></div>`;
     document.querySelectorAll('.channel-btn').forEach(b => b.classList.toggle('active', b.dataset.channel === currentChannel));
 }
 document.querySelectorAll('.channel-btn').forEach(btn => btn.addEventListener('click', () => { currentChannel = btn.dataset.channel; renderLingshi(); }));
-document.getElementById('lingshiSendBtn').addEventListener('click', () => {
-    const input = document.getElementById('lingshiInput');
-    const text = input.value.trim();
-    if (!text || !currentUser) return;
-    if (!lingshiMessages[currentChannel]) lingshiMessages[currentChannel] = [];
-    lingshiMessages[currentChannel].push({ user: currentUser.name, text, time: new Date().toLocaleString('zh-CN') });
-    safeSet('xuju_lingshi', lingshiMessages);
-    renderLingshi();
-    input.value = '';
-});
-document.getElementById('lingshiInput').addEventListener('keypress', e => { if(e.key==='Enter') document.getElementById('lingshiSendBtn').click(); });
-
-// 司内议室
-function renderInternalPosts() {
-    const list = document.getElementById('internalPostList');
-    list.innerHTML = internalPosts.slice().reverse().map(p => `
-        <div class="internal-post-item" data-id="${p.id}">
-            <div class="internal-post-title">${p.title}</div>
-            <div class="internal-post-meta">${p.author} · ${p.timestamp} · ${(p.comments||[]).length}回复</div>
-        </div>`).join('');
-    document.querySelectorAll('.internal-post-item').forEach(el => el.addEventListener('click', () => showInternalPostDetail(el.dataset.id)));
-}
-function showInternalPostDetail(id) {
-    const post = internalPosts.find(p => p.id === id);
-    if (!post) return;
-    document.getElementById('internalPostList').style.display = 'none';
-    const detail = document.getElementById('internalPostDetail');
-    detail.style.display = 'block';
-    detail.dataset.currentId = id;
-    document.getElementById('internalPostContent').innerHTML = `
-        <h3 style="color:#ddd;">${post.title}</h3>
-        <div style="color:#777;font-size:0.8rem;margin:10px 0;">${post.author} · ${post.timestamp}</div>
-        <div style="color:#ccc;line-height:1.7;white-space:pre-wrap;">${post.content}</div>
-        <hr style="border-color:#333;margin:20px 0;">
-        <h4 style="color:#aaa;">回复</h4>
-        ${(post.comments||[]).map(c => `<div style="margin:8px 0;"><span style="color:var(--gold);font-size:0.8rem;">${c.user} · ${c.time}</span><br><span style="color:#ccc;">${c.text}</span></div>`).join('')}`;
-}
-document.getElementById('internalBackBtn').addEventListener('click', () => {
-    document.getElementById('internalPostDetail').style.display = 'none';
-    document.getElementById('internalPostList').style.display = 'grid';
-    renderInternalPosts();
-});
-document.getElementById('internalNewPostBtn').addEventListener('click', () => {
-    const title = prompt('帖子标题：');
-    if (!title) return;
-    const content = prompt('帖子内容：');
-    if (!content) return;
-    internalPosts.push({ id:'ip'+Date.now(), title, content, author: currentUser ? currentUser.name : '匿名', timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
-    safeSet('xuju_internal_posts', internalPosts);
-    renderInternalPosts();
-});
-document.getElementById('internalCommentBtn').addEventListener('click', () => {
-    const text = document.getElementById('internalCommentInput').value.trim();
-    if (!text) return;
-    const postId = document.getElementById('internalPostDetail').dataset.currentId;
-    const post = internalPosts.find(p => p.id === postId);
-    if (!post) return;
-    post.comments = post.comments || [];
-    post.comments.push({ user: currentUser ? currentUser.name : '匿名', text, time:new Date().toLocaleString('zh-CN') });
-    safeSet('xuju_internal_posts', internalPosts);
-    showInternalPostDetail(postId);
-    document.getElementById('internalCommentInput').value = '';
-});
-
-// 悬赏榜
-function renderMissions() {
-    document.getElementById('missionsList').innerHTML = missions.map(m => `
-        <div class="mission-item risk-${m.risk}">
-            <div class="mission-title">${m.title}</div>
-            <div class="mission-meta"><span>风险: ${m.risk}</span><span>状态: ${m.status}</span><span>截止: ${m.deadline}</span></div>
-            <div class="mission-desc">${m.desc}</div>
-        </div>`).join('');
-}
-
-// 个人主页
+document.getElementById('lingshiSendBtn').addEventListener('click', () => { const text = document.getElementById('lingshiInput').value.trim(); if (!text) return alert('请输入消息'); if (!window.currentUser) return alert('请先登录'); if (!lingshiMessages[currentChannel]) lingshiMessages[currentChannel] = []; lingshiMessages[currentChannel].push({ user: window.currentUser.name, text, time: new Date().toLocaleString('zh-CN') }); safeSet('xuju_lingshi', lingshiMessages); renderLingshi(); document.getElementById('lingshiInput').value = ''; });
 function updateProfilePanel() {
-    if (!currentUser) return;
-    document.getElementById('profileName').textContent = currentUser.name;
-    document.getElementById('profileId').textContent = currentUser.id;
-    document.getElementById('loginCount').textContent = userLoginCounts[currentUser.id] || 0;
-    document.getElementById('profileRole').textContent = currentUser.isAdmin ? '管理员' : '访客';
-    document.getElementById('profileAvatar').textContent = currentUser.name.charAt(0);
-    const uid = currentUser.id;
-    document.getElementById('favList').innerHTML = (userFavorites[uid]||[]).map(id => {
-        const a = archiveData.find(x => x.id === id);
-        return a ? `<div onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${a.id} ${a.title}</div>` : '';
-    }).join('') || '暂无收藏';
-    document.getElementById('historyList').innerHTML = (userHistory[uid]||[]).slice(0,10).map(id => {
-        const a = archiveData.find(x => x.id === id);
-        return a ? `<div onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${a.id} ${a.title}</div>` : '';
-    }).join('') || '暂无记录';
+    if (!window.currentUser) return;
+    document.getElementById('profileName').textContent = window.currentUser.name;
+    document.getElementById('profileId').textContent = window.currentUser.id;
+    const uid = window.currentUser.id;
+    const favorites = userFavorites[uid] || [];
+    const history = userHistory[uid] || [];
+    const completed = Math.min((missions || []).filter(m => m.status === '进行中' || m.status.includes('已')).length + 2, 9);
+    document.getElementById('statMission').textContent = completed;
+    document.getElementById('statFav').textContent = favorites.length;
+    document.getElementById('statHistory').textContent = history.length;
+    document.getElementById('favList').innerHTML = favorites.length
+        ? favorites.map(id => `<div>◎ ${id}</div>`).join('')
+        : '<div>暂无收藏记录</div>';
+    document.getElementById('historyList').innerHTML = history.length
+        ? history.slice(0, 5).map(id => `<div>⏱ ${id}</div>`).join('')
+        : '<div>暂无查看记录</div>';
 }
-
-// 管理面板
 function renderAdminList() {
-    document.getElementById('adminList').innerHTML = archiveData.map(a => `
-        <div class="admin-item">
-            <span class="admin-item-id">${a.id}</span>
-            <span class="admin-item-title">${a.title}</span>
-            <small style="color:#666;">[${a.category}]</small>
-            <button onclick="editArchive('${a.id}')" style="background:transparent;border:1px solid #555;color:#aaa;cursor:pointer;">编辑</button>
-        </div>`).join('');
+    const archiveHtml = archiveData.map(a => `<div class="admin-item"><span>${a.id} ${a.title}</span><button onclick="editArchive('${a.id}')" style="color:var(--accent-red);">编辑</button></div>`).join('');
+    const postHtml = forumPosts.slice().reverse().map(post => `<div class="admin-item"><span>${post.id} ${post.title}</span><button onclick="editForumPost('${post.id}')" style="color:var(--accent-red);">编辑</button></div>`).join('');
+    document.getElementById('adminList').innerHTML = `
+        <div style="margin-bottom:18px;">
+            <h3 style="margin-bottom:10px; color:var(--text-muted); font-size:0.8rem; letter-spacing:0.1em; text-transform:uppercase;">档案库</h3>
+            ${archiveHtml || '<div class="admin-item">暂无档案</div>'}
+        </div>
+        <div>
+            <h3 style="margin-bottom:10px; color:var(--text-muted); font-size:0.8rem; letter-spacing:0.1em; text-transform:uppercase;">论坛帖子</h3>
+            ${postHtml || '<div class="admin-item">暂无帖子</div>'}
+        </div>
+    `;
 }
-let editingId = null;
-window.editArchive = function(id) {
-    const item = archiveData.find(a => a.id === id);
-    if (!item) return;
-    editingId = id;
-    document.getElementById('editId').value = item.id;
-    document.getElementById('editTitle').value = item.title;
-    document.getElementById('editCategory').value = item.category;
-    document.getElementById('editTags').value = item.tags.join(', ');
-    document.getElementById('editSummary').value = item.summary;
-    document.getElementById('editContent').value = item.content;
-    document.getElementById('modalTitle').textContent = '编辑: ' + id;
-    document.getElementById('editModal').style.display = 'flex';
+window.editArchive = function(id) { const item = archiveData.find(a => a.id === id); if (!item) return; editingId = id; document.getElementById('editId').value = item.id; document.getElementById('editTitle').value = item.title; document.getElementById('editCategory').value = item.category; document.getElementById('editTags').value = item.tags.join(', '); document.getElementById('editSummary').value = item.summary; document.getElementById('editContent').value = item.content; document.getElementById('modalTitle').textContent = '编辑: ' + id; document.getElementById('editModal').style.display = 'flex'; };
+window.editForumPost = function(id) {
+    const post = forumPosts.find(p => p.id === id);
+    if (!post) return;
+    document.getElementById('postEditTitle').value = post.title;
+    document.getElementById('postEditBoard').value = post.board || '灵异见闻';
+    document.getElementById('postEditImage').value = post.image || '';
+    document.getElementById('postEditContent').value = post.content || '';
+    document.getElementById('postModalTitle').textContent = '编辑帖子: ' + post.id;
+    document.getElementById('postEditModal').dataset.postId = post.id;
+    document.getElementById('postEditModal').style.display = 'flex';
 };
-function saveEdit() {
-    const newData = {
-        id: document.getElementById('editId').value.trim(),
-        title: document.getElementById('editTitle').value.trim(),
-        category: document.getElementById('editCategory').value,
-        tags: document.getElementById('editTags').value.split(',').map(s=>s.trim()).filter(s=>s),
-        summary: document.getElementById('editSummary').value.trim(),
-        content: document.getElementById('editContent').value.trim()
-    };
-    if(!newData.id||!newData.title) return alert('编号和标题必填');
-    if(editingId) { const idx = archiveData.findIndex(a=>a.id===editingId); if(idx>-1) archiveData[idx]=newData; }
-    else archiveData.push(newData);
-    safeSet('xuju_archive', archiveData);
-    document.getElementById('editModal').style.display='none';
-    renderAdminList(); renderArchiveList(); updateProfilePanel();
+function saveEdit() { const newData = { id: document.getElementById('editId').value.trim(), title: document.getElementById('editTitle').value.trim(), category: document.getElementById('editCategory').value, tags: document.getElementById('editTags').value.split(',').map(s=>s.trim()).filter(s=>s), summary: document.getElementById('editSummary').value.trim(), content: document.getElementById('editContent').value.trim() }; if(!newData.id||!newData.title) return alert('必填'); if(editingId) { const idx = archiveData.findIndex(a=>a.id===editingId); if(idx>-1) archiveData[idx]=newData; } else archiveData.push(newData); safeSet('xuju_archive', archiveData); document.getElementById('editModal').style.display='none'; renderAdminList(); renderArchiveList(); }
+function deleteArchive() { if(!editingId||!confirm('删除？')) return; archiveData = archiveData.filter(a=>a.id!==editingId); safeSet('xuju_archive', archiveData); document.getElementById('editModal').style.display='none'; renderAdminList(); renderArchiveList(); }
+function saveForumPostEdit() {
+    const postId = document.getElementById('postEditModal').dataset.postId;
+    const title = document.getElementById('postEditTitle').value.trim();
+    const board = document.getElementById('postEditBoard').value;
+    const image = document.getElementById('postEditImage').value.trim();
+    const content = document.getElementById('postEditContent').value.trim();
+    if (!title || !content) return alert('请填写标题和正文');
+    const idx = forumPosts.findIndex(p => p.id === postId);
+    if (idx >= 0) {
+        forumPosts[idx] = { ...forumPosts[idx], title, board, image: image || forumPosts[idx].image, content, timestamp: new Date().toLocaleString('zh-CN') };
+    } else {
+        forumPosts.unshift({ id: 'p' + Date.now(), title, board, image, content, author: forumNickname || '匿名', timestamp: new Date().toLocaleString('zh-CN'), comments: [] });
+    }
+    savePosts();
+    renderFeaturedPosts();
+    renderPostList();
+    document.getElementById('postEditModal').style.display = 'none';
+    renderAdminList();
 }
-function deleteArchive() {
-    if(!editingId||!confirm('永久删除？')) return;
-    archiveData = archiveData.filter(a=>a.id!==editingId);
+function deleteForumPost() {
+    const postId = document.getElementById('postEditModal').dataset.postId;
+    if (!postId || !confirm('确认删除此帖子？')) return;
+    forumPosts = forumPosts.filter(p => p.id !== postId);
+    savePosts();
+    renderFeaturedPosts();
+    renderPostList();
+    document.getElementById('postEditModal').style.display = 'none';
+    renderAdminList();
+}
+function bulkInsertArchiveFromText() {
+    const text = document.getElementById('bulkContentInput').value.trim();
+    if (!text) return alert('没有内容可写入');
+    const title = safePrompt('请输入新档案标题：') || '新档案';
+    const category = safePrompt('请输入分类：世界观 / 人物 / 收容物 / 事件', '世界观') || '世界观';
+    const summary = text.replace(/\s+/g, ' ').slice(0, 80) || '新导入文档';
+    const paragraphs = text.split(/\n{2,}|\r\n\r\n+/).filter(Boolean).map(p => `<p>${escapeHtml(p.trim().replace(/\n/g, '<br>'))}</p>`).join('');
+    archiveData.unshift({ id: `AUTO-${Date.now()}`, title, category, tags: [category], summary, content: paragraphs || `<p>${escapeHtml(text)}</p>` });
     safeSet('xuju_archive', archiveData);
-    document.getElementById('editModal').style.display='none';
-    renderAdminList(); renderArchiveList();
+    renderAdminList();
+    renderArchiveList();
+    document.getElementById('bulkContentInput').value = '';
+}
+async function importDocxToBulk() {
+    const input = document.getElementById('docxImportInput');
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+        if (!window.mammoth || typeof window.mammoth.extractRawText !== 'function') {
+            alert('文档解析库未加载成功，请刷新页面后重试。');
+            return;
+        }
+        const result = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+        const text = result.value.trim();
+        if (!text) {
+            alert('文档中没有可读取的正文内容。');
+            return;
+        }
+        document.getElementById('bulkContentInput').value = text;
+        alert('文档已导入，可直接写入档案或保存本地。');
+    } catch (error) {
+        console.error(error);
+        alert('导入失败：' + error.message);
+    } finally {
+        input.value = '';
+    }
 }
 function setupEditorEvents() {
     document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
     document.getElementById('deleteArchiveBtn').addEventListener('click', deleteArchive);
     document.getElementById('closeModalBtn').addEventListener('click', ()=>document.getElementById('editModal').style.display='none');
-    document.getElementById('addNewArchiveBtn').addEventListener('click', ()=>{
-        editingId=null;
-        ['editId','editTitle','editTags','editSummary','editContent'].forEach(f=>document.getElementById(f).value='');
-        document.getElementById('editCategory').value='世界观';
-        document.getElementById('modalTitle').textContent='新增档案';
-        document.getElementById('editModal').style.display='flex';
-    });
-    document.getElementById('resetDefaultBtn').addEventListener('click', ()=>{
-        if(confirm('重置所有档案？')) { archiveData = JSON.parse(JSON.stringify(DEFAULT_ARCHIVES)); safeSet('xuju_archive', archiveData); renderAdminList(); renderArchiveList(); }
-    });
-    document.getElementById('insertImageBtn').addEventListener('click', ()=>{
-        const url = prompt('图片链接：'); if(url) document.getElementById('editContent').value += `<img src="${url}" style="max-width:200px;">`;
-    });
-    const dropZone = document.getElementById('imageDropZone');
-    const contentTA = document.getElementById('editContent');
-    ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('dragover'); }));
-    ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('dragover'); }));
-    dropZone.addEventListener('drop', e=>{
-        [...e.dataTransfer.files].forEach(file=>{
-            if(!file.type.startsWith('image/')) return;
-            const reader = new FileReader();
-            reader.onload = ev => contentTA.value += `<img src="${ev.target.result}" style="max-width:200px;">`;
-            reader.readAsDataURL(file);
-        });
-    });
+    document.getElementById('addNewArchiveBtn').addEventListener('click', ()=>{ editingId=null; ['editId','editTitle','editTags','editSummary','editContent'].forEach(f=>document.getElementById(f).value=''); document.getElementById('editCategory').value='世界观'; document.getElementById('modalTitle').textContent='新增档案'; document.getElementById('editModal').style.display='flex'; });
+    document.getElementById('managePostsBtn').addEventListener('click', () => { renderAdminList(); document.getElementById('adminPanel').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    document.getElementById('importDocxBtn').addEventListener('click', () => document.getElementById('docxImportInput').click());
+    document.getElementById('docxImportInput').addEventListener('change', importDocxToBulk);
+    document.getElementById('createArchiveFromBulkBtn').addEventListener('click', bulkInsertArchiveFromText);
+    document.getElementById('saveLocalDataBtn').addEventListener('click', () => { saveLocalDataBundle(); exportLocalDataBundle(); });
+    document.getElementById('exportDataBtn').addEventListener('click', exportLocalDataBundle);
+    document.getElementById('resetDefaultBtn').addEventListener('click', ()=>{ if(confirm('重置？')) { archiveData = JSON.parse(JSON.stringify(DEFAULT_ARCHIVES)); safeSet('xuju_archive', archiveData); renderAdminList(); renderArchiveList(); } });
+    document.getElementById('insertImageBtn').addEventListener('click', ()=>{ const url = safePrompt('图片链接：'); if(url && url.trim()) document.getElementById('editContent').value += `<img src="${url.trim()}" style="max-width:200px;border:1px solid var(--border-color);margin:5px 0;">`; });
+    document.getElementById('insertPostImageBtn').addEventListener('click', ()=>{ const url = safePrompt('图片链接：'); if(url && url.trim()) document.getElementById('postEditContent').value += `\n\n<img src="${url.trim()}" style="max-width:220px; border:1px solid var(--border-color); margin:10px 0;">`; });
+    document.getElementById('savePostEditBtn').addEventListener('click', saveForumPostEdit);
+    document.getElementById('deletePostEditBtn').addEventListener('click', deleteForumPost);
+    document.getElementById('closePostEditBtn').addEventListener('click', ()=>document.getElementById('postEditModal').style.display='none');
+    const dropZone = document.getElementById('imageDropZone'); const contentTA = document.getElementById('editContent'); ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('dragover'); })); ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('dragover'); })); dropZone.addEventListener('drop', e=>{ [...e.dataTransfer.files].forEach(file=>{ if(!file.type.startsWith('image/')) return; const reader = new FileReader(); reader.onload = ev => contentTA.value += `<img src="${ev.target.result}" style="max-width:200px;border:1px solid var(--border-color);margin:5px 0;">`; reader.readAsDataURL(file); }); });
 }
 
-// 环境效果
-function setupAudio() {
-    const audio = document.getElementById('bgAudio');
-    if (DEFAULT_AUDIO_SRC) {
-        document.getElementById('audioSource').src = DEFAULT_AUDIO_SRC;
-        audio.load();
-        audio.volume = 0.3;
-        // 尝试自动播放（如果被拦截，用户点击按钮时也能播）
-        audio.muted = true; // 先静音
-        audio.play().then(() => {
-            audio.muted = false; // 播放成功后再取消静音
-            document.getElementById('audioIndicator').textContent = '🔊';
-        }).catch(() => {
-            audio.muted = false;
-        });
-    }
-    document.getElementById('audioToggleBtn').addEventListener('click', ()=>{
-        if(audio.paused){
-            audio.muted = false;
-            audio.play().then(() => {
-                document.getElementById('audioToggleBtn').textContent='暂停';
-                document.getElementById('audioIndicator').textContent='🔊';
-            }).catch(err => console.log('播放失败', err));
-        } else {
-            audio.pause();
-            document.getElementById('audioToggleBtn').textContent='播放';
-            document.getElementById('audioIndicator').textContent='🔇';
+// ============ 异常信号监测网（离线 SVG 网络图，替代 Leaflet 在线地图） ============
+const SIGNAL_SITES = [
+    { id:'a', name:'临江', level:'赤', status:'空间坍缩', time:'2024-11-22', desc:'旧城区边缘持续侦测到维度裂隙回响，规则型空域处于生成前兆，建议外勤小队保持待命。' },
+    { id:'b', name:'沧溟', level:'青', status:'模因污染', time:'2025-03-15', desc:'沿海地段出现认知污染残留，与"沧溟-2018-S级风暴事件"能量波形高度吻合，需持续追踪。' },
+    { id:'c', name:'旧纸厂', level:'待处理', status:'能量溢出', time:'2026-01-20', desc:'废弃厂区信号异常波动，疑似收容物级能量驻留，尚未完成现场核验，勿单独接近。' },
+    { id:'d', name:'梧桐巷', level:'观测', status:'民俗社', time:'持续', desc:'临川民俗研究社团活动区域，锚点能量平稳，标记为长期观测点位。' }
+];
+function initMap() {
+    const mapEl = document.getElementById('signalMap');
+    if (!mapEl) return;
+    const readout = document.getElementById('sigReadout');
+    const selectSite = (site) => {
+        if (!site) return;
+        if (readout) {
+            readout.innerHTML = `
+                <div class="sig-readout-head">📍 ${site.name} · ${site.level}级异常</div>
+                <div class="sig-readout-body">${site.desc}</div>
+                <div class="sig-readout-meta">状态：${site.status} ｜ 记录：${site.time}</div>`;
         }
-    });
-    document.getElementById('volumeSlider').addEventListener('input', e => {
-        audio.volume = e.target.value/100;
-        audio.muted = false;
-    });
-}
-function startRain() {
-    const canvas = document.getElementById('rainCanvas');
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const ctx = canvas.getContext('2d');
-    const drops = Array.from({length:300}, ()=>({x:Math.random()*canvas.width, y:Math.random()*canvas.height, speed:6+Math.random()*10, len:10+Math.random()*15}));
-    function draw() {
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.strokeStyle='rgba(180,190,200,0.6)'; ctx.lineWidth=1;
-        ctx.beginPath();
-        drops.forEach(d=>{ ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-1,d.y+d.len); d.y+=d.speed; if(d.y>canvas.height){ d.y=-10; d.x=Math.random()*canvas.width; } });
-        ctx.stroke();
-        requestAnimationFrame(draw);
-    }
-    draw();
-}
-function startTypewriter() {
-    const el = document.getElementById('typewriterText');
-    const msg = "欢迎回来，操作员。认知污染监测正常。";
-    el.textContent = ''; let i=0;
-    const t = setInterval(() => { if(i<msg.length) el.textContent += msg.charAt(i++); else clearInterval(t); }, 70);
-}
-setInterval(()=>{
-    const flash = document.getElementById('glitchFlash');
-    if(Math.random()<0.04){ flash.style.background='rgba(255,0,0,0.06)'; setTimeout(()=>flash.style.background='transparent',120); }
-},2500);
-
-// ============ 初始渲染 ============
-try {
-    renderPostList();
-} catch(e) {
-    console.error('论坛渲染失败:', e);
-}m => {
-        const card = document.createElement('div');
-        card.className = 'archive-card';
-        card.innerHTML = `
-            <div class="card-header"><span class="card-id">${item.id}</span><span class="card-category">${item.category}</span></div>
-            <div class="card-title">${item.title}</div>
-            <div class="card-summary">${item.summary}</div>
-            <div class="card-actions"><button class="fav-btn" data-id="${item.id}">⭐ 收藏</button><button class="view-detail-btn">📄 查看详情</button></div>`;
-        card.querySelector('.view-detail-btn').addEventListener('click', e => { e.stopPropagation(); openArchiveDetail(item); });
-        card.addEventListener('click', () => openArchiveDetail(item));
-        card.querySelector('.fav-btn').addEventListener('click', e => { e.stopPropagation(); toggleFavorite(item.id); renderArchiveList(); });
-        list.appendChild(card);
-    });
-}
-function openArchiveDetail(item) {
-    addHistory(item.id);
-    const modal = document.getElementById('archiveDetailModal');
-    const content = document.getElementById('archiveDetailContent');
-    content.innerHTML = `
-        <div class="archive-detail-header"><h2>${item.title}</h2><span class="archive-detail-category">${item.category}</span></div>
-        <div class="archive-detail-body">${item.content}</div>`;
-    modal.style.display = 'flex';
-}
-document.getElementById('closeArchiveDetailBtn').addEventListener('click', () => {
-    document.getElementById('archiveDetailModal').style.display = 'none';
-});
-document.getElementById('archiveDetailModal').addEventListener('click', e => {
-    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
-});
-function addHistory(id) {
-    if (!currentUser) return;
-    const uid = currentUser.id;
-    userHistory[uid] = [id, ...userHistory[uid].filter(x => x !== id)].slice(0, 20);
-    safeSet('xuju_history', userHistory);
-}
-function toggleFavorite(id) {
-    if (!currentUser) return;
-    const uid = currentUser.id;
-    if (!userFavorites[uid]) userFavorites[uid] = [];
-    const idx = userFavorites[uid].indexOf(id);
-    idx > -1 ? userFavorites[uid].splice(idx, 1) : userFavorites[uid].push(id);
-    safeSet('xuju_favs', userFavorites);
-}
-
-// 灵犀通讯
-function renderLingshi() {
-    const msgs = lingshiMessages[currentChannel] || [];
-    const container = document.getElementById('lingshiMessages');
-    if (container) container.innerHTML = msgs.map(m => `<div class="lingshi-msg"><div class="lingshi-msg-user">${m.user} · ${m.time}</div><div class="lingshi-msg-text">${m.text}</div></div>`).join('');
-    const nameEl = document.getElementById('currentChannelName');
-    if (nameEl) nameEl.textContent = '#' + (currentChannel === 'main' ? '总局频道' : currentChannel === 'club' ? '民俗社五人' : currentChannel === 'operation' ? '外勤行动' : '档案室');
-    document.querySelectorAll('.channel-btn').forEach(b => b.classList.toggle('active', b.dataset.channel === currentChannel));
-}
-document.querySelectorAll('.channel-btn').forEach(btn => btn.addEventListener('click', () => { currentChannel = btn.dataset.channel; renderLingshi(); }));
-document.getElementById('lingshiSendBtn').addEventListener('click', () => {
-    const input = document.getElementById('lingshiInput');
-    const text = input.value.trim();
-    if (!text || !currentUser) return;
-    if (!lingshiMessages[currentChannel]) lingshiMessages[currentChannel] = [];
-    lingshiMessages[currentChannel].push({ user: currentUser.name, text, time: new Date().toLocaleString('zh-CN') });
-    safeSet('xuju_lingshi', lingshiMessages);
-    renderLingshi();
-    input.value = '';
-});
-document.getElementById('lingshiInput').addEventListener('keypress', e => { if(e.key==='Enter') document.getElementById('lingshiSendBtn').click(); });
-
-// 司内议室
-function renderInternalPosts() {
-    const list = document.getElementById('internalPostList');
-    list.innerHTML = internalPosts.slice().reverse().map(p => `
-        <div class="internal-post-item" data-id="${p.id}">
-            <div class="internal-post-title">${p.title}</div>
-            <div class="internal-post-meta">${p.author} · ${p.timestamp} · ${(p.comments||[]).length}回复</div>
-        </div>`).join('');
-    document.querySelectorAll('.internal-post-item').forEach(el => el.addEventListener('click', () => showInternalPostDetail(el.dataset.id)));
-}
-function showInternalPostDetail(id) {
-    const post = internalPosts.find(p => p.id === id);
-    if (!post) return;
-    document.getElementById('internalPostList').style.display = 'none';
-    const detail = document.getElementById('internalPostDetail');
-    detail.style.display = 'block';
-    detail.dataset.currentId = id;
-    document.getElementById('internalPostContent').innerHTML = `
-        <h3 style="color:#ddd;">${post.title}</h3>
-        <div style="color:#777;font-size:0.8rem;margin:10px 0;">${post.author} · ${post.timestamp}</div>
-        <div style="color:#ccc;line-height:1.7;white-space:pre-wrap;">${post.content}</div>
-        <hr style="border-color:#333;margin:20px 0;">
-        <h4 style="color:#aaa;">回复</h4>
-        ${(post.comments||[]).map(c => `<div style="margin:8px 0;"><span style="color:var(--gold);font-size:0.8rem;">${c.user} · ${c.time}</span><br><span style="color:#ccc;">${c.text}</span></div>`).join('')}`;
-}
-document.getElementById('internalBackBtn').addEventListener('click', () => {
-    document.getElementById('internalPostDetail').style.display = 'none';
-    document.getElementById('internalPostList').style.display = 'grid';
-    renderInternalPosts();
-});
-document.getElementById('internalNewPostBtn').addEventListener('click', () => {
-    const title = prompt('帖子标题：');
-    if (!title) return;
-    const content = prompt('帖子内容：');
-    if (!content) return;
-    internalPosts.push({ id:'ip'+Date.now(), title, content, author: currentUser ? currentUser.name : '匿名', timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
-    safeSet('xuju_internal_posts', internalPosts);
-    renderInternalPosts();
-});
-document.getElementById('internalCommentBtn').addEventListener('click', () => {
-    const text = document.getElementById('internalCommentInput').value.trim();
-    if (!text) return;
-    const postId = document.getElementById('internalPostDetail').dataset.currentId;
-    const post = internalPosts.find(p => p.id === postId);
-    if (!post) return;
-    post.comments = post.comments || [];
-    post.comments.push({ user: currentUser ? currentUser.name : '匿名', text, time:new Date().toLocaleString('zh-CN') });
-    safeSet('xuju_internal_posts', internalPosts);
-    showInternalPostDetail(postId);
-    document.getElementById('internalCommentInput').value = '';
-});
-
-// 悬赏榜
-function renderMissions() {
-    document.getElementById('missionsList').innerHTML = missions.map(m => `
-        <div class="mission-item risk-${m.risk}">
-            <div class="mission-title">${m.title}</div>
-            <div class="mission-meta"><span>风险: ${m.risk}</span><span>状态: ${m.status}</span><span>截止: ${m.deadline}</span></div>
-            <div class="mission-desc">${m.desc}</div>
-        </div>`).join('');
-}
-
-// 个人主页
-function updateProfilePanel() {
-    if (!currentUser) return;
-    document.getElementById('profileName').textContent = currentUser.name;
-    document.getElementById('profileId').textContent = currentUser.id;
-    document.getElementById('loginCount').textContent = userLoginCounts[currentUser.id] || 0;
-    document.getElementById('profileRole').textContent = currentUser.isAdmin ? '管理员' : '访客';
-    document.getElementById('profileAvatar').textContent = currentUser.name.charAt(0);
-    const uid = currentUser.id;
-    document.getElementById('favList').innerHTML = (userFavorites[uid]||[]).map(id => {
-        const a = archiveData.find(x => x.id === id);
-        return a ? `<div onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${a.id} ${a.title}</div>` : '';
-    }).join('') || '暂无收藏';
-    document.getElementById('historyList').innerHTML = (userHistory[uid]||[]).slice(0,10).map(id => {
-        const a = archiveData.find(x => x.id === id);
-        return a ? `<div onclick="switchPanel('archive'); document.getElementById('archiveSearchInput').value='${id}'; renderArchiveList();">${a.id} ${a.title}</div>` : '';
-    }).join('') || '暂无记录';
-}
-
-// 管理面板
-function renderAdminList() {
-    document.getElementById('adminList').innerHTML = archiveData.map(a => `
-        <div class="admin-item">
-            <span class="admin-item-id">${a.id}</span>
-            <span class="admin-item-title">${a.title}</span>
-            <small style="color:#666;">[${a.category}]</small>
-            <button onclick="editArchive('${a.id}')" style="background:transparent;border:1px solid #555;color:#aaa;cursor:pointer;">编辑</button>
-        </div>`).join('');
-}
-let editingId = null;
-window.editArchive = function(id) {
-    const item = archiveData.find(a => a.id === id);
-    if (!item) return;
-    editingId = id;
-    document.getElementById('editId').value = item.id;
-    document.getElementById('editTitle').value = item.title;
-    document.getElementById('editCategory').value = item.category;
-    document.getElementById('editTags').value = item.tags.join(', ');
-    document.getElementById('editSummary').value = item.summary;
-    document.getElementById('editContent').value = item.content;
-    document.getElementById('modalTitle').textContent = '编辑: ' + id;
-    document.getElementById('editModal').style.display = 'flex';
-};
-function saveEdit() {
-    const newData = {
-        id: document.getElementById('editId').value.trim(),
-        title: document.getElementById('editTitle').value.trim(),
-        category: document.getElementById('editCategory').value,
-        tags: document.getElementById('editTags').value.split(',').map(s=>s.trim()).filter(s=>s),
-        summary: document.getElementById('editSummary').value.trim(),
-        content: document.getElementById('editContent').value.trim()
+        mapEl.querySelectorAll('.sig-node').forEach(n => n.classList.remove('active'));
+        const node = mapEl.querySelector(`.sig-node[data-site="${site.name}"]`);
+        if (node) node.classList.add('active');
     };
-    if(!newData.id||!newData.title) return alert('编号和标题必填');
-    if(editingId) { const idx = archiveData.findIndex(a=>a.id===editingId); if(idx>-1) archiveData[idx]=newData; }
-    else archiveData.push(newData);
-    safeSet('xuju_archive', archiveData);
-    document.getElementById('editModal').style.display='none';
-    renderAdminList(); renderArchiveList(); updateProfilePanel();
-}
-function deleteArchive() {
-    if(!editingId||!confirm('永久删除？')) return;
-    archiveData = archiveData.filter(a=>a.id!==editingId);
-    safeSet('xuju_archive', archiveData);
-    document.getElementById('editModal').style.display='none';
-    renderAdminList(); renderArchiveList();
-}
-function setupEditorEvents() {
-    document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
-    document.getElementById('deleteArchiveBtn').addEventListener('click', deleteArchive);
-    document.getElementById('closeModalBtn').addEventListener('click', ()=>document.getElementById('editModal').style.display='none');
-    document.getElementById('addNewArchiveBtn').addEventListener('click', ()=>{
-        editingId=null;
-        ['editId','editTitle','editTags','editSummary','editContent'].forEach(f=>document.getElementById(f).value='');
-        document.getElementById('editCategory').value='世界观';
-        document.getElementById('modalTitle').textContent='新增档案';
-        document.getElementById('editModal').style.display='flex';
-    });
-    document.getElementById('resetDefaultBtn').addEventListener('click', ()=>{
-        if(confirm('重置所有档案？')) { archiveData = JSON.parse(JSON.stringify(DEFAULT_ARCHIVES)); safeSet('xuju_archive', archiveData); renderAdminList(); renderArchiveList(); }
-    });
-    document.getElementById('insertImageBtn').addEventListener('click', ()=>{
-        const url = prompt('图片链接：'); if(url) document.getElementById('editContent').value += `<img src="${url}" style="max-width:200px;">`;
-    });
-    const dropZone = document.getElementById('imageDropZone');
-    const contentTA = document.getElementById('editContent');
-    ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('dragover'); }));
-    ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('dragover'); }));
-    dropZone.addEventListener('drop', e=>{
-        [...e.dataTransfer.files].forEach(file=>{
-            if(!file.type.startsWith('image/')) return;
-            const reader = new FileReader();
-            reader.onload = ev => contentTA.value += `<img src="${ev.target.result}" style="max-width:200px;">`;
-            reader.readAsDataURL(file);
+    mapEl.querySelectorAll('.sig-node').forEach(node => {
+        node.addEventListener('click', () => {
+            const site = SIGNAL_SITES.find(s => s.name === node.dataset.site);
+            selectSite(site);
         });
     });
+    // 默认高亮第一个节点，展示一条摘要
+    if (SIGNAL_SITES.length) selectSite(SIGNAL_SITES[0]);
 }
 
-// 环境效果
-function setupAudio() {
-    const audio = document.getElementById('bgAudio');
-    if (DEFAULT_AUDIO_SRC) {
-        document.getElementById('audioSource').src = DEFAULT_AUDIO_SRC;
-        audio.load();
-        audio.volume = 0.3;
-        // 尝试自动播放（如果被拦截，用户点击按钮时也能播）
-        audio.muted = true; // 先静音
-        audio.play().then(() => {
-            audio.muted = false; // 播放成功后再取消静音
-            document.getElementById('audioIndicator').textContent = '🔊';
-        }).catch(() => {
-            audio.muted = false;
-        });
-    }
-    document.getElementById('audioToggleBtn').addEventListener('click', ()=>{
-        if(audio.paused){
-            audio.muted = false;
-            audio.play().then(() => {
-                document.getElementById('audioToggleBtn').textContent='暂停';
-                document.getElementById('audioIndicator').textContent='🔊';
-            }).catch(err => console.log('播放失败', err));
-        } else {
-            audio.pause();
-            document.getElementById('audioToggleBtn').textContent='播放';
-            document.getElementById('audioIndicator').textContent='🔇';
-        }
-    });
-    document.getElementById('volumeSlider').addEventListener('input', e => {
-        audio.volume = e.target.value/100;
-        audio.muted = false;
-    });
-}
-function startRain() {
-    const canvas = document.getElementById('rainCanvas');
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const ctx = canvas.getContext('2d');
-    const drops = Array.from({length:300}, ()=>({x:Math.random()*canvas.width, y:Math.random()*canvas.height, speed:6+Math.random()*10, len:10+Math.random()*15}));
-    function draw() {
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.strokeStyle='rgba(180,190,200,0.6)'; ctx.lineWidth=1;
-        ctx.beginPath();
-        drops.forEach(d=>{ ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-1,d.y+d.len); d.y+=d.speed; if(d.y>canvas.height){ d.y=-10; d.x=Math.random()*canvas.width; } });
-        ctx.stroke();
-        requestAnimationFrame(draw);
-    }
-    draw();
-}
-function startTypewriter() {
-    const el = document.getElementById('typewriterText');
-    const msg = "欢迎回来，操作员。认知污染监测正常。";
-    el.textContent = ''; let i=0;
-    const t = setInterval(() => { if(i<msg.length) el.textContent += msg.charAt(i++); else clearInterval(t); }, 70);
-}
-setInterval(()=>{
-    const flash = document.getElementById('glitchFlash');
-    if(Math.random()<0.04){ flash.style.background='rgba(255,0,0,0.06)'; setTimeout(()=>flash.style.background='transparent',120); }
-},2500);
+let rainAnimId = null; let glitchTimer = null;
+function startRain() { const canvas = document.getElementById('rainCanvas'); if (!canvas) return; if(rainAnimId) { cancelAnimationFrame(rainAnimId); } const ctx = canvas.getContext('2d'); function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; } window.removeEventListener('resize', resizeCanvas); window.addEventListener('resize', resizeCanvas); resizeCanvas(); const drops = Array.from({length:150}, ()=>({x: Math.random()*canvas.width, y: Math.random()*canvas.height, speed: 4 + Math.random()*6, len: 8 + Math.random()*12})); function draw() { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1.5; ctx.beginPath(); drops.forEach(d=>{ ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-1,d.y+d.len); d.y+=d.speed; if(d.y>canvas.height+20){ d.y=-20; d.x=Math.random()*canvas.width; } }); ctx.stroke(); rainAnimId = requestAnimationFrame(draw); } draw(); if(glitchTimer) clearInterval(glitchTimer); glitchTimer = setInterval(() => { const flash = document.getElementById('glitchFlash'); if(!flash) return; if(Math.random() < 0.03){ flash.style.background = 'rgba(207, 42, 42, 0.2)'; flash.style.width = (20 + Math.random()*80) + '%'; setTimeout(() => { flash.style.background = 'transparent'; flash.style.width = '100%'; }, 120); } }, 2000); }
 
-// ============ 初始渲染 ============
+const WELCOME_MESSAGES = [
+    "欢迎登入，终端已连通，请注意安全。",
+    "欢迎登入，认知污染监测正常。",
+    "欢迎登入，底层数据重构完成。",
+    "欢迎登入，屏蔽层生效，外部无法侦测。",
+    "欢迎登入，终端界面加载完毕，开始工作吧。"
+];
+function startTypewriter() { const el = document.getElementById('typewriterText'); const msg = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)]; el.textContent = ''; let i=0; const t = setInterval(() => { if(i<msg.length) el.textContent += msg.charAt(i++); else clearInterval(t); }, 60); }
+
+// ============ 初始化 ============
 try {
+    startStars();
+    setupForumMiniPlayer();
+    renderFeaturedPosts();
     renderPostList();
-} catch(e) {
-    console.error('论坛渲染失败:', e);
-}
+    document.getElementById('dailyFortune').textContent = getDailyFortune();
+    updatePortalStatus();
+} catch(e) { console.error('初始化失败:', e); }

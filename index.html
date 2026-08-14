@@ -7,190 +7,403 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
-    <!-- 加载过场动画 -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-box">
-            <div class="loading-symbol"><img src="images/logo.png" alt="加载中" style="width:80px; height:80px;"></div>
-            <div class="loading-text" id="loadingText">正在建立灵枢链接...</div>
-            <div class="loading-progress"><span id="loadingBar"></span></div>
-        </div>
+    <div id="terminalLoading" class="terminal-loading" style="display:none;">
+        <img src="images/dragon-logo.png" onerror="this.style.display='none'" alt="龙纹" style="width: 120px; height: 120px; margin-bottom: 30px;">
+        <div class="loading-text" id="loadingText">正在建立灵枢链接... <span id="percentText">0%</span></div>
+        <div class="pixel-progress"><span id="loadingBar"></span></div>
     </div>
 
     <!-- 暗巷论坛 -->
     <div id="forumContainer">
+        <audio id="forumAudio" loop preload="auto"><source src="" id="forumAudioSource"></audio>
+        <canvas id="starCanvas"></canvas>
+        
         <header class="forum-header">
             <div class="forum-logo"><span class="logo-icon">☽</span> 暗 巷</div>
             <nav class="forum-nav">
                 <a href="#" class="nav-link active" id="forumHomeLink">首页</a>
                 <a href="#" class="nav-link" id="forumNewPostLink">发帖</a>
-                <span class="awaken-link" id="awakenEntryBtn">🔒 内部入口</span>
+                <a href="#" class="nav-link" id="forumProfileLink">我的</a>
             </nav>
         </header>
+
+        <div id="forumVinylPlayer" class="vinyl-player forum-player">
+            <div class="island-notch"></div>
+            <div class="disc-wrapper">
+                <img src="images/island-cover.jpg" alt="唱片" class="record-disc" id="forumVinylDisc">
+            </div>
+            <div class="player-controls">
+                <div class="track-info">
+                    <span id="forumStatusText">环境音</span>
+                    <span id="forumActionText">[ 暂停 ]</span>
+                </div>
+                <button id="forumMiniPlayBtn" class="mini-play-btn">▶</button>
+            </div>
+        </div>
+
+        <div class="featured-posts-section">
+            <div class="featured-posts-slider" id="featuredSlider"></div>
+        </div>
+
+        <div class="board-tabs">
+            <button class="board-tab active" data-board="all">全部</button>
+            <button class="board-tab" data-board="灵异见闻">灵异见闻</button>
+            <button class="board-tab" data-board="巷中秘闻">巷中秘闻</button>
+            <button class="board-tab" data-board="求助解惑">求助解惑</button>
+            <button class="board-tab" data-board="民俗考据">民俗考据</button>
+        </div>
+
         <div class="forum-body">
             <aside class="forum-sidebar">
-                <div class="sidebar-box">
-                    <h4>论坛统计</h4>
-                    <ul><li>帖子总数：<span id="totalPosts">6</span></li><li>今日新帖：<span id="todayPosts">2</span></li><li>匿名用户：<span>∞</span></li></ul>
+                <div class="sidebar-box forum-user-card">
+                    <div class="forum-user-avatar"><span>☽</span></div>
+                    <div class="forum-user-name">匿名访客</div>
+                    <div class="forum-user-stats">
+                        <span><b id="totalPosts">0</b>帖子</span>
+                        <span><b>∞</b>用户</span>
+                        <span><b class="blink">13</b>在线</span>
+                    </div>
+                </div>
+                <div class="sidebar-box checkin-box">
+                    <div class="checkin-head">
+                        <span class="checkin-label">每日签到</span>
+                        <span class="checkin-streak" id="checkinStreak">连签 0 天</span>
+                    </div>
+                    <div class="checkin-stats">
+                        <span>🌙 等级 <b id="checkinLevel">Lv.1</b></span>
+                        <span>✨ 积分 <b id="checkinPoints">0</b></span>
+                    </div>
+                    <button id="checkinBtn" class="checkin-btn">☾ 今日签到</button>
+                    <div class="checkin-tip" id="checkinTip">签到可得积分，连续签到奖励更多</div>
+                </div>
+                <div class="sidebar-box sidebar-totem">
+                    <div class="forum-totem-wrap">
+                        <img src="images/hesychia-emblem.jpg" alt="暗巷图腾" class="forum-totem" loading="lazy">
+                        <div class="forum-totem-caption">巷 · 守夜人</div>
+                    </div>
                 </div>
                 <div class="sidebar-box">
-                    <h4>热门标签</h4>
-                    <div class="tag-cloud"><span class="tag">#医院</span><span class="tag">#规则</span><span class="tag">#手抄本</span><span class="tag">#镜子</span><span class="tag">#过阴</span></div>
+                    <h4>板块导航</h4>
+                    <ul id="boardStats" class="board-stats">
+                        <li data-board="灵异见闻">灵异见闻 <span class="stat-num">0</span></li>
+                        <li data-board="巷中秘闻">巷中秘闻 <span class="stat-num">0</span></li>
+                        <li data-board="求助解惑">求助解惑 <span class="stat-num">0</span></li>
+                        <li data-board="民俗考据">民俗考据 <span class="stat-num">0</span></li>
+                    </ul>
+                </div>
+                <div class="sidebar-box">
+                    <h4>每日一签</h4>
+                    <div id="dailyFortune" class="daily-fortune"></div>
+                </div>
+                <div class="sidebar-box sidebar-alert">
+                    <h4>⚠ 巷规</h4>
+                    <p class="announce-text">本巷为匿名讨论区，请勿暴露真实身份与位置。深夜发帖请谨慎，部分帖子可能被莫名删除。</p>
+                    <p class="announce-rule">— 夜路莫回头 —</p>
                 </div>
             </aside>
             <main class="forum-main">
                 <section id="postListView">
-                    <div class="list-header"><h2>最新讨论</h2></div>
                     <div id="postList" class="post-list"></div>
                 </section>
-                <section id="postDetailView" class="post-detail-container" style="display:none;">
+                <section id="postDetailView" class="post-detail-container detail-overlay" style="display:none;">
                     <button class="back-btn" id="backToListBtn">← 返回</button>
                     <div id="postDetailContent"></div>
-                    <div class="comment-section"><h3>回复</h3><div id="commentList"></div><div class="comment-form"><input type="text" id="commentInput" placeholder="说点什么吧（匿名）..."><button id="submitCommentBtn">发表</button></div></div>
+                    <div class="comment-section"><h3>回复</h3><div id="commentList"></div><div class="comment-form"><input type="text" id="commentInput" placeholder="说点什么吧..."><button id="submitCommentBtn">发表</button></div></div>
                 </section>
                 <section id="newPostForm" class="new-post-container" style="display:none;">
                     <button class="back-btn" id="cancelNewPostBtn">← 取消</button>
                     <h2>发布新讨论</h2>
+                    <select id="newPostBoard"><option value="灵异见闻">灵异见闻</option><option value="巷中秘闻">巷中秘闻</option><option value="求助解惑">求助解惑</option><option value="民俗考据">民俗考据</option></select>
                     <input type="text" id="newPostTitle" placeholder="标题"><textarea id="newPostContent" placeholder="内容" rows="8"></textarea>
                     <button class="submit-btn" id="submitNewPostBtn">发布</button>
+                </section>
+                <section id="forumProfileView" class="forum-profile-container" style="display:none;">
+                    <button class="back-btn" id="profileBackBtn">← 返回</button>
+                    <div class="forum-profile-header">
+                        <img src="images/user-icon.png" onerror="this.src=''; this.style.display='none';" alt="用户头像" style="width:50px; height:50px; border-radius:50%; border:1px solid var(--accent-red); background:#333;">
+                        <div><h2 id="forumProfileName">匿名</h2><div class="forum-profile-sub" id="forumProfileSub">已签到 0 天 · Lv.1</div></div>
+                    </div>
+                    <div class="profile-tabs">
+                        <button class="profile-tab active" data-tab="overview">概览</button>
+                        <button class="profile-tab" data-tab="myposts">我的帖子</button>
+                        <button class="profile-tab" data-tab="checkin">签到记录</button>
+                        <button class="profile-tab" data-tab="friends">好友</button>
+                        <button class="profile-tab" data-tab="messages">私信</button>
+                    </div>
+                    <div id="overviewPanel" class="profile-tab-panel">
+                        <div class="profile-overview-grid">
+                            <div class="profile-ov-item"><b id="ovPosts">0</b><span>发帖</span></div>
+                            <div class="profile-ov-item"><b id="ovCheckin">0</b><span>签到</span></div>
+                            <div class="profile-ov-item"><b id="ovStreak">0</b><span>连签</span></div>
+                            <div class="profile-ov-item"><b id="ovPoints">0</b><span>积分</span></div>
+                        </div>
+                        <div class="profile-section"><h3>🎯 快捷操作</h3><div class="profile-quick-actions"><button id="quickCheckinBtn" class="admin-btn">☾ 立即签到</button><button id="quickNewPostBtn" class="admin-btn">✍ 去发帖</button></div></div>
+                    </div>
+                    <div id="mypostsPanel" class="profile-tab-panel" style="display:none;"><div class="profile-myposts" id="mypostsList"></div></div>
+                    <div id="checkinPanel" class="profile-tab-panel" style="display:none;"><div class="checkin-history" id="checkinHistory"></div></div>
+                    <div id="friendsPanel" class="profile-tab-panel" style="display:none;"><div class="friends-list" id="friendsList"></div><button id="addFriendBtn" class="admin-btn">+ 添加好友</button></div>
+                    <div id="messagesPanel" class="profile-tab-panel" style="display:none;"><div class="messages-list" id="messagesList"></div><div class="message-form"><input type="text" id="messageRecipient" placeholder="收件人"><input type="text" id="messageContent" placeholder="内容"><button id="sendMessageBtn">发送</button></div></div>
                 </section>
             </main>
         </div>
         <footer class="forum-footer">
-            <p>暗巷 - 匿名灵异讨论区 | 本站内容均为网友自发上传</p>
-            <p class="footer-awaken">如果你知道那扇门，<a href="#" id="awakenEntryFooter">点击这里</a> 进入墟管局终端。</p>
+            <p>暗巷 - 匿名灵异讨论区</p>
+            <p class="footer-awaken"><a href="#" id="awakenEntryFooter">[ 如果你知道那扇门 ]</a></p>
         </footer>
     </div>
 
-    <!-- 觉醒者登录弹窗 -->
+    <!-- 登录弹窗 -->
     <div class="modal-overlay" id="awakenModal" style="display:none;">
         <div class="modal-box awaken-login-box">
             <button class="modal-close" id="closeAwakenModalBtn">✕</button>
-            <div class="login-header"><div class="logo-icon">⚠️</div><div class="logo-text">全域墟化现象管控总局</div><div class="logo-sub">INTERNAL ARCHIVE TERMINAL</div></div>
-            <div class="login-warning"><span>🔒 仅限司级以上人员登录</span><small>未授权访问将触发认知污染追踪</small></div>
+            <div class="login-header"><div class="logo-icon">⚠️</div><div class="logo-text">全域墟化现象管控总局</div></div>
+            <div class="login-warning">仅限司级以上人员登录</div>
             <div class="login-form">
-                <label class="input-label">员工编号</label><input type="text" id="staffIdInput" placeholder="例: QYXH-2026-001">
-                <label class="input-label">验证口令</label><input type="password" id="passwordInput" placeholder="输入动态口令">
+                <div class="form-group">
+                    <label class="input-label">员工编号</label>
+                    <input type="text" id="staffIdInput" placeholder="编号">
+                </div>
+                <div class="form-group">
+                    <label class="input-label">验证口令</label>
+                    <input type="password" id="passwordInput" placeholder="口令">
+                </div>
                 <button id="loginBtn">◈ 连接终端 ◈</button>
-                <div class="login-hint">访客：<code>QYXH-GUEST</code> / <code>visitor</code><br>管理员：<code>ADMIN-001</code> / <code>admin123</code></div>
+                <div class="login-hint">访客：QYXH-GUEST / visitor<br>管理员：ADMIN-001 / admin123</div>
                 <div id="loginError" class="error-msg"></div>
             </div>
         </div>
     </div>
 
     <!-- 墟管局终端 -->
+    <audio id="bgAudio" loop preload="auto"><source src="" id="audioSource"></audio>
     <div id="terminalContainer" style="display:none;">
+        <div class="noise-overlay"></div>
+        <div class="moon-deco"></div>
+        <div class="star-deco"></div>
         <canvas id="rainCanvas"></canvas>
         <div class="scanlines"></div>
         <div class="glitch-flash" id="glitchFlash"></div>
+
         <div class="main-container">
             <header class="top-bar">
                 <div class="status-line">
-                    <span>终端ID: QYXH-2026-001</span>
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <img src="images/dragon-logo.png" onerror="this.style.display='none'" alt="墟管局龙纹" style="height:35px; width:35px;">
+                        <span>终端ID: QYXH-2026-001</span>
+                    </div>
                     <span>密级: <span class="blink">绝密</span></span>
                     <span>操作员: <span id="topUsername">---</span></span>
-                    <span id="topAdminBadge" style="display:none;color:#ffcc00;">[管理员]</span>
+                    <span id="topAdminBadge" style="display:none;color:#cf2a2a;">[管理员]</span>
                     <span class="audio-indicator" id="audioIndicator">🔇</span>
                 </div>
                 <nav class="main-nav">
-                    <button class="nav-btn active" data-panel="home">🏠 主页</button>
-                    <button class="nav-btn" data-panel="archive">📁 档案检索</button>
-                    <button class="nav-btn" data-panel="lingshi">💬 灵犀通讯</button>
-                    <button class="nav-btn" data-panel="internalForum">📋 司内议室</button>
-                    <button class="nav-btn" data-panel="missions">📜 悬赏榜</button>
-                    <button class="nav-btn" data-panel="profile">👤 个人主页</button>
-                    <button class="nav-btn admin-only" data-panel="admin" style="display:none;">⚙️ 管理</button>
-                    <button class="nav-btn logout-btn-top" id="logoutTopBtn">⏻ 断开</button>
+                    <button class="nav-btn active" data-panel="home"><span class="nav-ico">⌂</span>主页</button>
+                    <button class="nav-btn" data-panel="monitor"><span class="nav-ico">◎</span>监测</button>
+                    <button class="nav-btn" data-panel="containment"><span class="nav-ico">▤</span>收容物</button>
+                    <button class="nav-btn" data-panel="commBoard"><span class="nav-ico">✉</span>通讯</button>
+                    <button class="nav-btn" data-panel="archive"><span class="nav-ico">☰</span>档案</button>
+                    <button class="nav-btn" data-panel="lingshi"><span class="nav-ico">◈</span>灵犀</button>
+                    <button class="nav-btn" data-panel="internalForum"><span class="nav-ico">▣</span>议室</button>
+                    <button class="nav-btn" data-panel="missions"><span class="nav-ico">☒</span>悬赏</button>
+                    <button class="nav-btn" data-panel="profile"><span class="nav-ico">◉</span>个人</button>
+                    <button class="nav-btn admin-only" data-panel="admin" style="display:none;"><span class="nav-ico">⚙</span>管理</button>
+                    <button class="nav-btn logout-btn-top" id="logoutTopBtn"><span class="nav-ico">⏻</span>断开</button>
                 </nav>
             </header>
+
             <div class="panel-container">
-                <!-- 主页 -->
-                <div class="panel active" id="homePanel">
-                    <div class="home-banner">
-                        <div class="home-audio-box">
-                            <span>🎧 环境声</span>
-                            <audio id="bgAudio" loop preload="auto"><source src="" id="audioSource"></audio>
-                            <button id="audioToggleBtn" class="audio-btn">暂停</button>
-                            <input type="range" id="volumeSlider" min="0" max="100" value="30" class="volume-slider">
-                        </div>
-                        <h1 class="typewriter" id="typewriterText"></h1>
+                <div class="panel" id="monitorPanel">
+                    <div class="scp-header"><span>✦ 实时监测</span></div>
+                    <div class="monitor-legend">
+                        <span>信号网络</span>
+                        <span>旧城区</span>
+                        <span>待处理</span>
                     </div>
-                    <div class="home-announcement"><div class="announce-title">📢 总局公告</div><div class="announce-body"><p>· 2026.01.01 认知污染监测网升级完成</p><p>· 临川事件记忆抹除率 98.7%</p><p>· 赤级以上墟域禁止单独行动</p></div></div>
-                    <div class="home-index-grid">
-                        <div class="index-card" data-cat="世界观"><span class="index-icon">📜</span><span>世界观档案</span></div>
-                        <div class="index-card" data-cat="人物"><span class="index-icon">🕵️</span><span>觉醒者档案</span></div>
-                        <div class="index-card" data-cat="收容物"><span class="index-icon">⚱️</span><span>收容物规程</span></div>
-                        <div class="index-card" data-cat="事件"><span class="index-icon">⚠️</span><span>事件记录</span></div>
-                        <div class="index-card" data-cat="附录"><span class="index-icon">📰</span><span>附录资料</span></div>
-                        <div class="index-card" data-cat="国际"><span class="index-icon">🌍</span><span>国际参考</span></div>
+                    <div class="monitor-grid-overlay"></div>
+                    <div class="monitor-radar"></div>
+                    <div class="monitor-texture monitor-texture-blueprint"></div>
+                    <div class="monitor-texture monitor-texture-flower"></div>
+                    <div class="signal-map" id="signalMap">
+                        <svg class="signal-svg" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid meet">
+                            <defs>
+                                <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="rgba(207,42,42,0)" />
+                                    <stop offset="50%" stop-color="rgba(207,42,42,0.85)" />
+                                    <stop offset="100%" stop-color="rgba(207,42,42,0)" />
+                                </linearGradient>
+                                <radialGradient id="nodeGlow">
+                                    <stop offset="0%" stop-color="rgba(207,42,42,0.95)" />
+                                    <stop offset="100%" stop-color="rgba(207,42,42,0)" />
+                                </radialGradient>
+                            </defs>
+                            <line class="sig-line sig-line-a" x1="130" y1="120" x2="400" y2="210" />
+                            <line class="sig-line sig-line-b" x1="400" y1="210" x2="660" y2="130" />
+                            <line class="sig-line sig-line-c" x1="130" y1="120" x2="660" y2="130" />
+                            <circle class="sig-sweep" cx="400" cy="210" r="10" />
+                        </svg>
+                        <div class="sig-node sig-node-a" data-site="临江">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">临江</span>
+                            <span class="sig-node-tag">Keter·空间坍缩</span>
+                        </div>
+                        <div class="sig-node sig-node-b" data-site="沧溟">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">沧溟</span>
+                            <span class="sig-node-tag">Euclid·模因污染</span>
+                        </div>
+                        <div class="sig-node sig-node-c" data-site="旧纸厂">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">旧纸厂</span>
+                            <span class="sig-node-tag">待处理·能量溢出</span>
+                        </div>
+                        <div class="sig-node sig-node-d" data-site="梧桐巷">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">梧桐巷</span>
+                            <span class="sig-node-tag">观测·民俗社</span>
+                        </div>
+                        <div class="sig-readout" id="sigReadout">
+                            <div class="sig-readout-head">🔗 信号通道 · 待选节点</div>
+                            <div class="sig-readout-body">悬停或点击上方节点，查看该点位异常信号摘要。</div>
+                        </div>
                     </div>
                 </div>
-                <!-- 档案检索 -->
+                <div class="panel" id="containmentPanel"><div class="scp-header"><span>📁 收容物库</span><button onclick="switchPanel('archive')" class="admin-btn" style="margin-left:auto; border:1px solid #e03e3e; color:#e03e3e; padding: 2px 10px;">去档案</button></div><div id="containmentList" class="archive-list"></div></div>
+                <div class="panel" id="commBoardPanel"><div class="scp-header"><span>✉ 总局通讯</span></div><div id="commPostList" class="missions-list"></div></div>
+
+                <div class="panel active" id="homePanel">
+                    <div class="home-banner"><div style="width:100%;"><h1 class="typewriter" id="typewriterText"></h1></div></div>
+                    <div class="home-visual-layout">
+                        <div class="home-alert-card">
+                            <div class="announce-title">📢 总局公告</div>
+                            <div class="announce-body">
+                                <p>· 认知污染监测网升级完成，覆盖范围扩展至旧城区全域</p>
+                                <p>· 旧城区巡线区段已重新锁定，外勤三队例行巡检中</p>
+                                <p>· 编号 LC-Q-039「天极」已完成例行灵质校准</p>
+                                <p>· 请各司局于本周五前提交一季度认知污染处置报告</p>
+                                <p>· 梧桐巷民俗社观测点能量读数平稳，维持长期观测</p>
+                            </div>
+                        </div>
+                        <div class="home-map-card">
+                            <img src="images/hand-map.jpg" alt="区域地图">
+                            <div class="map-overlay"></div>
+                            <div class="map-label">区域扫描</div>
+                            <div class="map-pulse"></div>
+                        </div>
+                    </div>
+                    <div class="home-notice-strip" aria-label="快捷通知">
+                        <button class="notice-card" data-target="monitor"><span>区域扫描</span><small>进入监测</small></button>
+                        <button class="notice-card" data-target="archive" data-category="事件分支"><span>旧巷档案</span><small>查看事件记录</small></button>
+                        <button class="notice-card" data-target="commBoard"><span>总局通讯</span><small>内部通告</small></button>
+                        <button class="notice-card" data-target="containment"><span>收容名单</span><small>监控对象</small></button>
+                        <button class="notice-card" data-target="lingshi"><span>灵犀广播</span><small>班组对话</small></button>
+                    </div>
+                    <div class="terminal-fortune"><span class="fortune-label">今日一签</span><span id="terminalFortuneText"></span></div>
+                    <div class="home-index-grid">
+                        <div class="index-card" data-cat="墟界管理档案"><span class="index-ico">✧</span><span>墟界管理</span><small>管控总则</small></div>
+                        <div class="index-card" data-cat="叛逃人员档案"><span class="index-ico">◉</span><span>叛逃人员</span><small>通缉追踪</small></div>
+                        <div class="index-card" data-cat="收容物分支"><span class="index-ico">▤</span><span>收容物</span><small>异常名录</small></div>
+                        <div class="index-card" data-cat="事件分支"><span class="index-ico">☉</span><span>事件</span><small>异常记录</small></div>
+                    </div>
+                </div>
+
                 <div class="panel" id="archivePanel">
                     <div class="archive-nav-tabs">
                         <button class="cat-tab active" data-category="all">全部</button>
-                        <button class="cat-tab" data-category="世界观">世界观</button>
-                        <button class="cat-tab" data-category="人物">人物</button>
-                        <button class="cat-tab" data-category="收容物">收容物</button>
-                        <button class="cat-tab" data-category="事件">事件</button>
-                        <button class="cat-tab" data-category="附录">附录</button>
-                        <button class="cat-tab" data-category="国际">国际</button>
+                        <button class="cat-tab" data-category="墟界管理档案">墟界管理档案</button>
+                        <button class="cat-tab" data-category="叛逃人员档案">叛逃人员档案</button>
+                        <button class="cat-tab" data-category="人物档案">人物档案</button>
+                        <button class="cat-tab" data-category="收容物分支">收容物分支</button>
+                        <button class="cat-tab" data-category="事件分支">事件分支</button>
                     </div>
-                    <div class="archive-search"><span class="prompt">[root@xujuguan ~]# query</span><input type="text" id="archiveSearchInput" placeholder="输入关键词检索..."></div>
-                    <div class="archive-list" id="archiveList"></div>
+                    <div class="archive-search"><span class="prompt">[query]</span><input type="text" id="archiveSearchInput" placeholder="搜索..."></div>
+                    <div class="archive-container" id="archiveContainer">
+                        <div class="archive-sidebar" id="archiveSidebar"></div>
+                        <div class="archive-grid" id="archiveGrid"></div>
+                    </div>
                 </div>
-                <!-- 灵犀通讯 -->
                 <div class="panel" id="lingshiPanel">
                     <div class="lingshi-container">
-                        <div class="lingshi-sidebar"><h3>通讯频道</h3><button class="channel-btn active" data-channel="main"># 总局频道</button><button class="channel-btn" data-channel="club"># 民俗社五人</button><button class="channel-btn" data-channel="operation"># 外勤行动</button><button class="channel-btn" data-channel="archive"># 档案室</button></div>
-                        <div class="lingshi-main"><div class="lingshi-header"><span id="currentChannelName"># 总局频道</span></div><div class="lingshi-messages" id="lingshiMessages"></div><div class="lingshi-input-area"><input type="text" id="lingshiInput" placeholder="输入消息..."><button id="lingshiSendBtn">发送</button></div></div>
+                        <div class="lingshi-sidebar"><h3>频道</h3><button class="channel-btn active" data-channel="main"># 总局</button><button class="channel-btn" data-channel="club"># 民俗社</button><button class="channel-btn" data-channel="operation"># 外勤</button></div>
+                        <div class="lingshi-main"><div class="lingshi-header"># 总局</div><div class="lingshi-messages" id="lingshiMessages"></div><div class="lingshi-input-area"><input type="text" id="lingshiInput" placeholder="消息..."><button id="lingshiSendBtn">发送</button></div></div>
                     </div>
                 </div>
-                <!-- 司内议室 -->
                 <div class="panel" id="internalForumPanel">
-                    <div class="internal-forum-header"><h2>司内议室</h2><button id="internalNewPostBtn" class="admin-btn">发新帖</button></div>
-                    <div id="internalPostList" class="internal-post-list"></div>
-                    <div id="internalPostDetail" class="internal-post-detail" style="display:none;"><button class="back-btn" id="internalBackBtn">← 返回</button><div id="internalPostContent"></div><div class="comment-form"><input type="text" id="internalCommentInput" placeholder="回复..."><button id="internalCommentBtn">回复</button></div></div>
+                    <div class="internal-forum-header"><h2>司内议室</h2><button id="internalNewPostBtn" class="admin-btn">发帖</button></div>
+                    <div id="internalPostList"></div>
+                    <div id="internalPostDetail" style="display:none;"><button class="back-btn" id="internalBackBtn">← 返回</button><div id="internalPostContent"></div><div class="comment-form"><input type="text" id="internalCommentInput" placeholder="回复..."><button id="internalCommentBtn">回复</button></div></div>
                 </div>
-                <!-- 悬赏榜 -->
-                <div class="panel" id="missionsPanel">
-                    <div class="missions-header"><h2>悬赏榜</h2><span class="mission-note">* 任务实时更新，接取需上报备案</span></div>
-                    <div class="missions-list" id="missionsList"></div>
-                </div>
-                <!-- 个人主页 -->
+                <div class="panel" id="missionsPanel"><div class="missions-header"><h2>悬赏榜</h2></div><div class="missions-list" id="missionsList"></div></div>
                 <div class="panel" id="profilePanel">
-                    <div class="profile-card"><div class="profile-avatar" id="profileAvatar">?</div><div class="profile-info"><h2 id="profileName">操作员</h2><p>编号: <span id="profileId">---</span></p><p>登录次数: <span id="loginCount">1</span></p><p>权限等级: <span id="profileRole">访客</span></p></div></div>
-                    <div class="profile-section"><h3>📌 收藏的档案</h3><div id="favList" class="profile-list">暂无收藏</div></div>
-                    <div class="profile-section"><h3>🕓 最近浏览</h3><div id="historyList" class="profile-list">暂无记录</div></div>
+                    <div class="profile-card">
+                        <img src="images/user-icon.png" onerror="this.src=''; this.style.display='none';" alt="默认头像" style="width:60px; height:60px; border-radius:50%; border:2px solid #cf2a2a; background:#222;">
+                        <div><h2 id="profileName">操作员</h2><p id="profileId">---</p></div>
+                    </div>
+                    <div class="profile-summary-grid" id="profileSummaryGrid">
+                        <div class="profile-summary-item"><small>任务完成</small><strong id="statMission">0</strong></div>
+                        <div class="profile-summary-item"><small>收藏数</small><strong id="statFav">0</strong></div>
+                        <div class="profile-summary-item"><small>历史记录</small><strong id="statHistory">0</strong></div>
+                    </div>
+                    <div class="profile-section"><h3>📌 收藏</h3><div id="favList"></div></div>
+                    <div class="profile-section"><h3>🕓 最近</h3><div id="historyList"></div></div>
                 </div>
-                <!-- 管理面板 -->
                 <div class="panel" id="adminPanel">
-                    <div class="admin-controls"><button id="addNewArchiveBtn" class="admin-btn">+ 新增档案</button><button id="resetDefaultBtn" class="admin-btn danger">⟲ 重置为默认</button></div>
+                    <div class="admin-controls">
+                        <button id="addNewArchiveBtn" class="admin-btn">+ 新增档案</button>
+                        <button id="managePostsBtn" class="admin-btn">📝 管理帖子</button>
+                        <button id="importDocxBtn" class="admin-btn">📄 导入文档</button>
+                        <button id="exportDataBtn" class="admin-btn">💾 导出本地包</button>
+                        <button id="resetDefaultBtn" class="admin-btn danger">⟲ 重置</button>
+                    </div>
+                    <input id="docxImportInput" type="file" accept=".docx" hidden>
+                    <div class="admin-pack-box" style="margin-top:16px; border:1px solid var(--border-color); border-radius:10px; background:rgba(0,0,0,0.2); padding:14px;">
+                        <label style="display:block; margin-bottom:8px; color:var(--text-muted); font-size:0.8rem; letter-spacing:0.08em; text-transform:uppercase;">内容包导入</label>
+                        <textarea id="bulkContentInput" rows="8" placeholder="在这里粘贴大段正文，或直接导入 .docx 文档后自动填充"></textarea>
+                        <div class="modal-actions" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                            <button id="createArchiveFromBulkBtn" class="admin-btn">写入为新档案</button>
+                            <button id="saveLocalDataBtn" class="admin-btn">保存到本地</button>
+                        </div>
+                    </div>
                     <div class="admin-list" id="adminList"></div>
                 </div>
             </div>
-            <!-- 档案详情弹窗 -->
             <div class="modal-overlay" id="archiveDetailModal" style="display:none;">
                 <div class="modal-box archive-detail-box">
                     <button class="modal-close" id="closeArchiveDetailBtn">✕</button>
                     <div id="archiveDetailContent"></div>
                 </div>
             </div>
-            <!-- 编辑弹窗 -->
             <div class="modal-overlay" id="editModal" style="display:none;">
                 <div class="modal-box">
                     <h3 id="modalTitle">编辑档案</h3>
-                    <label>编号</label><input type="text" id="editId">
-                    <label>标题</label><input type="text" id="editTitle">
-                    <label>分类</label><select id="editCategory"><option>世界观</option><option>人物</option><option>收容物</option><option>事件</option><option>附录</option><option>国际</option></select>
-                    <label>标签</label><input type="text" id="editTags">
-                    <label>摘要</label><textarea id="editSummary" rows="2"></textarea>
-                    <label>详细内容</label>
-                    <div class="editor-toolbar"><button id="insertImageBtn">🔗 插入链接</button></div>
-                    <div class="dropzone" id="imageDropZone">🖼️ 拖拽图片到此处嵌入</div>
+                    <label>编号</label><input type="text" id="editId"><label>标题</label><input type="text" id="editTitle">
+                    <label>分类</label><select id="editCategory"><option>墟界管理档案</option><option>叛逃人员档案</option><option>人物档案</option><option>事件分支</option><option>收容物分支</option></select>
+                    <label>标签</label><input type="text" id="editTags"><label>摘要</label><textarea id="editSummary" rows="2"></textarea>
+                    <label>详细内容</label><div class="editor-toolbar"><button id="insertImageBtn">🔗 插图</button></div>
+                    <div class="dropzone" id="imageDropZone">🖼️ 拖拽图片到此处</div>
                     <textarea id="editContent" rows="10"></textarea>
                     <div class="modal-actions"><button id="saveEditBtn" class="admin-btn">保存</button><button id="deleteArchiveBtn" class="admin-btn danger">删除</button><button id="closeModalBtn" class="admin-btn">取消</button></div>
                 </div>
+            </div>
+            <div class="modal-overlay" id="postEditModal" style="display:none;">
+                <div class="modal-box">
+                    <h3 id="postModalTitle">编辑帖子</h3>
+                    <label>标题</label><input type="text" id="postEditTitle">
+                    <label>板块</label><select id="postEditBoard"><option value="灵异见闻">灵异见闻</option><option value="巷中秘闻">巷中秘闻</option><option value="求助解惑">求助解惑</option><option value="民俗考据">民俗考据</option></select>
+                    <label>封面/插图地址</label><input type="text" id="postEditImage" placeholder="images/xxx.jpg">
+                    <label>正文</label><div class="editor-toolbar"><button id="insertPostImageBtn">🔗 插图</button></div>
+                    <textarea id="postEditContent" rows="12"></textarea>
+                    <div class="modal-actions"><button id="savePostEditBtn" class="admin-btn">保存</button><button id="deletePostEditBtn" class="admin-btn danger">删除</button><button id="closePostEditBtn" class="admin-btn">取消</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="vinylPlayer" class="vinyl-player terminal-player">
+            <div class="disc-wrapper">
+                <img src="images/red-vinyl.png" alt="唱片" class="record-disc" id="vinylDisc">
+            </div>
+            <div class="player-controls">
+                <div class="track-info"><span id="statusText">环境声</span><span id="actionText">[ 暂停 ]</span></div>
+                <button id="miniPlayBtn" class="mini-play-btn">▶</button>
             </div>
         </div>
     </div>
