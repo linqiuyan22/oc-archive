@@ -21,6 +21,9 @@ let currentPanel = 'home';
 let activeCategory = 'all';
 let activeSubCategory = 'all';
 let currentBoard = 'all';
+let currentPostPage = 1;
+const POST_PAGE_SIZE = 8;
+let activeContainmentType = 'all';
 let currentChannel = 'main';
 let terminalInited = false;
 let editingId = null;
@@ -43,7 +46,7 @@ function purgeLegacySiteStorage() {
         'darkalley_posts', 'darkalley_featured', 'xuju_archive', 'xuju_lingshi',
         'xuju_internal_posts', 'xuju_missions', 'xuju_logincounts', 'xuju_history',
         'darkalley_friends', 'darkalley_messages', 'site_local_data_bundle', 'xuju_daily_fortune',
-        'xuju_archive_version'
+        'xuju_archive_version', 'xuju_rule_flags'
     ];
     const archiveSaved = safeGetJSON('xuju_archive', []);
     const postsSaved = safeGetJSON('darkalley_posts', []);
@@ -282,10 +285,16 @@ function renderPostList() {
     if (!list) return;
     let filtered = forumPosts;
     if (currentBoard !== 'all') filtered = filtered.filter(p => p.board === currentBoard);
-    if (!filtered || filtered.length === 0) {
+    const total = (filtered || []).length;
+    const totalPages = Math.max(1, Math.ceil(total / POST_PAGE_SIZE));
+    if (currentPostPage > totalPages) currentPostPage = totalPages;
+    if (currentPostPage < 1) currentPostPage = 1;
+    const reversed = (filtered || []).slice().reverse();
+    const pageItems = reversed.slice((currentPostPage - 1) * POST_PAGE_SIZE, currentPostPage * POST_PAGE_SIZE);
+    if (total === 0) {
         list.innerHTML = `<div class="post-item" style="text-align:center;color:var(--text-muted);pointer-events:none;border-color:transparent;">该板块还没有帖子，快来发布第一篇讨论吧。</div>`;
     } else {
-        list.innerHTML = filtered.slice().reverse().map(p => {
+        list.innerHTML = pageItems.map(p => {
             const cover = p.image && String(p.image).trim() ? String(p.image).trim() : 'images/feature1.jpg';
             return `
             <div class="post-item" data-id="${p.id}">
@@ -307,9 +316,76 @@ function renderPostList() {
     document.querySelectorAll('.post-item[data-id]').forEach(el => {
         el.addEventListener('click', () => showPostDetail(el.dataset.id));
     });
+    renderPagination(totalPages);
     document.getElementById('totalPosts').textContent = forumPosts.length;
-    renderBoardStats();
     renderCheckin();
+}
+
+function renderPagination(totalPages) {
+    const wrap = document.getElementById('postPagination');
+    if (!wrap) return;
+    if (totalPages <= 1) { wrap.innerHTML = ''; return; }
+    const parts = [];
+    parts.push(`<button class="page-btn" data-page="${currentPostPage - 1}" ${currentPostPage === 1 ? 'disabled' : ''}>‹ 上一页</button>`);
+    const pages = [];
+    for (let p = 1; p <= totalPages; p++) {
+        if (p === 1 || p === totalPages || Math.abs(p - currentPostPage) <= 1) {
+            if (pages[pages.length - 1] !== p) pages.push(p);
+        }
+    }
+    let last = 0;
+    pages.forEach(p => {
+        if (last && p - last > 1) parts.push('<span class="page-ellipsis">…</span>');
+        parts.push(`<button class="page-btn${p === currentPostPage ? ' active' : ''}" data-page="${p}">${p}</button>`);
+        last = p;
+    });
+    parts.push(`<button class="page-btn" data-page="${currentPostPage + 1}" ${currentPostPage === totalPages ? 'disabled' : ''}>下一页 ›</button>`);
+    wrap.innerHTML = parts.join('');
+    wrap.querySelectorAll('.page-btn[data-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const p = parseInt(btn.dataset.page, 10);
+            if (isNaN(p) || p < 1 || p > totalPages) return;
+            currentPostPage = p;
+            renderPostList();
+        });
+    });
+}
+
+// ============  论坛动态（模拟实时活跃度） ============
+function updateForumStatus() {
+    const online = Math.floor(Math.random() * 76) + 45; // 45-120 人
+    const newPosts = Math.floor(Math.random() * 13) + 3; // 3-15 帖
+    ['onlineCount', 'onlineCountDetail'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = online;
+    });
+    const npe = document.getElementById('todayNewPosts');
+    if (npe) npe.textContent = newPosts;
+    // 最热话题：当前回复数最多的帖子
+    const hot = (forumPosts || []).slice().sort((a, b) => (b.comments || []).length - (a.comments || []).length)[0];
+    const hte = document.getElementById('hotTopic');
+    if (hte) {
+        if (hot) {
+            hte.innerHTML = `<a href="#" class="hot-link" data-id="${hot.id}" title="查看帖子">${hot.title}</a>`;
+            const hl = hte.querySelector('.hot-link');
+            if (hl) hl.addEventListener('click', (e) => { e.preventDefault(); if (forumPosts.find(p => p.id === hl.dataset.id)) showPostDetail(hl.dataset.id); });
+        } else {
+            hte.textContent = '暂无话题';
+        }
+    }
+    // 在线用户列表（从已有帖子作者中随机选 5-8 个）
+    const ue = document.getElementById('onlineUsers');
+    if (ue) {
+        const pool = [...new Set((forumPosts || []).map(p => p.author))].filter(a => a && a !== '系统管理员');
+        if (!pool.length) { ue.innerHTML = '<li class="online-empty">—</li>'; }
+        else {
+            const count = Math.floor(Math.random() * 4) + 5; // 5-8 个
+            const copy = pool.slice();
+            const chosen = [];
+            while (chosen.length < count && copy.length) chosen.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+            ue.innerHTML = chosen.map(u => `<li><span class="online-dot"></span>${u}</li>`).join('');
+        }
+    }
 }
 
 // ============ 每日签到 ============
@@ -355,74 +431,6 @@ function doCheckin() {
 }
 if (document.getElementById('checkinBtn')) {
     document.getElementById('checkinBtn').addEventListener('click', doCheckin);
-}
-
-function renderBoardStats() {
-    const statsEl = document.getElementById('boardStats');
-    if (!statsEl) return;
-    const boards = [
-        { name: '灵异见闻', icon: '👁️', desc: '怪事目击' },
-        { name: '巷中秘闻', icon: '🌫️', desc: '巷间怪谈' },
-        { name: '求助解惑', icon: '🕯️', desc: '遇事问询' },
-        { name: '民俗考据', icon: '📜', desc: '民间志异' },
-    ];
-    statsEl.innerHTML = boards.map(b => {
-        const count = forumPosts.filter(p => p.board === b.name).length;
-        return `<li data-board="${b.name}">
-            <span class="board-ico">${b.icon}</span>
-            <span class="board-name">${b.name}<small>${b.desc}</small></span>
-            <span class="stat-num">${count}</span>
-        </li>`;
-    }).join('');
-    // 侧边栏板块导航可点击，切换到对应板块
-    statsEl.querySelectorAll('li[data-board]').forEach(li => {
-        li.addEventListener('click', () => {
-            const board = li.dataset.board;
-            const tab = document.querySelector(`.board-tab[data-board="${board}"]`);
-            if (tab) {
-                document.querySelectorAll('.board-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentBoard = board;
-                renderPostList();
-            }
-        });
-    });
-}
-
-function bindHomeNoticeActions() {
-    document.querySelectorAll('.notice-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const target = card.dataset.target;
-            const category = card.dataset.category || 'all';
-            if (target === 'monitor') {
-                switchPanel('monitor');
-                initMap();
-                return;
-            }
-            if (target === 'archive') {
-                switchPanel('archive');
-                activeCategory = category;
-                document.querySelectorAll('.cat-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.category === activeCategory));
-                renderArchiveList();
-                return;
-            }
-            if (target === 'commBoard') {
-                switchPanel('commBoard');
-                renderCommBoard();
-                return;
-            }
-            if (target === 'containment') {
-                switchPanel('containment');
-                renderContainmentList();
-                return;
-            }
-            if (target === 'lingshi') {
-                switchPanel('lingshi');
-                renderLingshi();
-                return;
-            }
-        });
-    });
 }
 
 window.showPostDetail = function(id) {
@@ -511,7 +519,7 @@ function backToList() {
     document.getElementById('postDetailView').style.display = 'none';
     document.getElementById('newPostForm').style.display = 'none';
     document.getElementById('forumProfileView').style.display = 'none';
-    document.getElementById('postListView').style.display = 'block';
+    document.getElementById('postListView').style.display = 'flex';
     // 关闭详情时恢复外层滚动
     document.body.style.overflow = '';
     renderPostList();
@@ -523,6 +531,7 @@ document.querySelectorAll('.board-tab').forEach(tab => {
         document.querySelectorAll('.board-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         currentBoard = tab.dataset.board;
+        currentPostPage = 1;
         renderPostList();
     });
 });
@@ -532,6 +541,7 @@ document.getElementById('submitNewPostBtn').addEventListener('click', () => {
     const board = document.getElementById('newPostBoard').value;
     if (!title || !content) return alert('请填写标题和内容');
     forumPosts.push({ id:'p'+Date.now(), title, content, board, author: forumNickname, timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
+    currentPostPage = 1;
     savePosts(); backToList();
 });
 document.getElementById('submitCommentBtn').addEventListener('click', () => {
@@ -647,13 +657,28 @@ document.getElementById('closeAwakenModalBtn').addEventListener('click', () => d
 function showTerminalLoading(callback) {
     const loader = document.getElementById('terminalLoading');
     if (!loader) { if (callback) callback(); return; }
-    const bar = document.getElementById('loadingBar'); const percentText = document.getElementById('percentText');
-    loader.style.display = 'flex'; bar.style.width = '0%'; let progress = 0;
+    const ring = document.getElementById('ringBar');
+    const percentText = document.getElementById('percentText');
+    const loadingText = document.getElementById('loadingText');
+    const CIRC = 2 * Math.PI * 72;
+    if (ring) { ring.style.strokeDasharray = CIRC; ring.style.strokeDashoffset = CIRC; }
+    loader.style.display = 'flex';
+    let progress = 0;
+    const stages = [[0,'正在建立灵枢链接…'],[28,'校准锚点频率…'],[52,'注入认知屏蔽层…'],[74,'同步收容物库…'],[90,'链路稳定…']];
     const timer = setInterval(() => {
-        progress += Math.floor(Math.random() * 6) + 4; if (progress > 100) progress = 100;
-        bar.style.width = progress + '%'; percentText.textContent = progress + '%';
-        if (progress >= 100) { clearInterval(timer); setTimeout(() => { loader.style.display = 'none'; if (callback) callback(); }, 500); }
-    }, 180);
+        progress += Math.floor(Math.random() * 6) + 4;
+        if (progress > 100) progress = 100;
+        if (ring) ring.style.strokeDashoffset = CIRC - (CIRC * progress / 100);
+        if (percentText) percentText.textContent = progress + '%';
+        const stage = stages.filter(s => progress >= s[0]).pop();
+        if (stage && loadingText) loadingText.textContent = stage[1];
+        if (progress >= 100) {
+            clearInterval(timer);
+            if (loadingText) loadingText.textContent = '链接完成';
+            loader.classList.add('done');
+            setTimeout(() => { loader.classList.remove('done'); loader.style.display = 'none'; if (callback) callback(); }, 480);
+        }
+    }, 150);
 }
 
 // ============ 终端面板逻辑 ============
@@ -661,7 +686,7 @@ function initTerminal() {
     if (terminalInited) return;
     terminalInited = true; loadArchive(); saveLocalDataBundle(); bindTerminalNav(); startRain();
     startTypewriter(); renderLingshi(); renderInternalPosts(); renderMissions();
-    setupEditorEvents(); bindHomeNoticeActions(); switchPanel('home'); updateProfilePanel();
+    setupEditorEvents(); switchPanel('home'); renderHomeEmbed('bureau'); updateProfilePanel();
     document.getElementById('terminalFortuneText').textContent = getDailyFortune();
 }
 window.switchPanel = function(name) {
@@ -686,10 +711,17 @@ window.switchPanel = function(name) {
     if (name === 'monitor') initMap();
     if (name === 'containment') renderContainmentList();
     if (name === 'commBoard') renderCommBoard();
+    if (name === 'bureau') renderBureau();
+    if (name === 'experiment') renderExperimentRecords();
+    if (name === 'entities') renderEntities();
+    if (name === 'action') renderActionRecords();
 }
 function bindTerminalNav() {
     document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => btn.addEventListener('click', () => switchPanel(btn.dataset.panel)));
-    document.querySelectorAll('.index-card').forEach(card => card.addEventListener('click', () => { const cat = card.dataset.cat; const tab = document.querySelector(`.cat-tab[data-category="${cat}"]`); if (tab) { tab.click(); switchPanel('archive'); } }));
+    document.querySelectorAll('.index-card').forEach(card => card.addEventListener('click', () => {
+        if (card.dataset.panel) { renderHomeEmbed(card.dataset.panel); return; }
+        const cat = card.dataset.cat; const tab = document.querySelector(`.cat-tab[data-category="${cat}"]`); if (tab) { tab.click(); switchPanel('archive'); }
+    }));
     document.querySelectorAll('.cat-tab').forEach(tab => tab.addEventListener('click', () => {
         document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
@@ -956,31 +988,78 @@ function openArchiveDetail(item) {
     `;
 
     modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
     content.innerHTML = `${header}<div style="line-height:1.7;color:var(--text-secondary);">${item.content}</div>`;
 }
-document.getElementById('closeArchiveDetailBtn').addEventListener('click', () => document.getElementById('archiveDetailModal').style.display = 'none');
-document.getElementById('archiveDetailModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.style.display = 'none'; });
+function closeArchiveDetail() {
+    document.getElementById('archiveDetailModal').style.display = 'none';
+    document.body.style.overflow = '';
+}
+document.getElementById('closeArchiveDetailBtn').addEventListener('click', closeArchiveDetail);
+document.getElementById('archiveDetailModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeArchiveDetail(); });
 function addHistory(id) { if (!window.currentUser) return; const uid = window.currentUser.id; userHistory[uid] = [id, ...userHistory[uid].filter(x => x !== id)].slice(0, 20); safeSet('xuju_history', userHistory); }
 
-function renderContainmentList() { const list = document.getElementById('containmentList'); if(!CONTAINMENT_ITEMS || CONTAINMENT_ITEMS.length === 0) { list.innerHTML = '<div>暂无数据。</div>'; return; } list.innerHTML = CONTAINMENT_ITEMS.map(item => ` <div class="archive-card" style="border-left:3px solid var(--accent-red);padding:12px;background:rgba(0,0,0,0.3);margin-bottom:10px;"> <div style="display:flex;justify-content:space-between;"><span style="color:var(--accent-red);">${item.id}</span><span style="color:var(--text-muted);">${item.level}</span></div> <div style="font-weight:bold;margin:4px 0;">${item.name}</div> <div style="color:var(--text-secondary);font-size:0.9rem;">${item.desc}</div> </div> `).join(''); }
-function renderCommBoard() { const list = document.getElementById('commPostList'); if(!INTERNAL_BOARDS || INTERNAL_BOARDS.length === 0) { list.innerHTML = '<div>暂无总局内部通讯。</div>'; return; } list.innerHTML = INTERNAL_BOARDS.map(item => ` <div style="padding:12px;border-bottom:1px solid var(--border-color);"> <div style="font-weight:bold;">📌 ${item.title}</div> <div style="color:var(--text-secondary);font-size:0.9rem;margin:6px 0;padding:6px 0;border-bottom:1px solid var(--border-color);">${item.content}</div> <div style="color:var(--accent-red);font-family:'Comic Sans MS',cursive;font-size:0.95rem;border-left:3px solid var(--accent-red);padding-left:10px;">✍ 【批注】${item.comment}</div> </div> `).join(''); }
+function formatLevel(level) { const s = String(level || ''); const map = [ { k:'壬', label:'壬阶', cls:'lv-ren' }, { k:'辛', label:'辛阶', cls:'lv-xin' }, { k:'庚', label:'庚阶', cls:'lv-geng' }, { k:'己', label:'己阶', cls:'lv-ji' }, { k:'戊', label:'戊阶', cls:'lv-wu' }, { k:'丁', label:'丁阶', cls:'lv-ding' } ]; for (const m of map) { if (s.indexOf(m.k) !== -1) return { label: m.label, cls: m.cls }; } return { label: s || '未知', cls: 'lv-xin' }; }
+function containmentSummary(item) { const raw = item.desc || item.appearance || ''; const text = String(raw).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(); return text.length > 50 ? text.slice(0, 50) + '…' : text; }
+function renderContainmentDetail(item) { if (!item) return ''; const rows = []; const add = (label, val) => { if (val) rows.push(`<div class="cd-row"><span class="cd-label">${label}</span><div class="cd-value">${val}</div></div>`); }; add('形态描述', item.appearance); add('作用机制', item.mechanism); add('使用限制与禁忌', item.restrictions); add('关联事件', item.events); add('当前状态', item.status); if (item.notes) rows.push(`<div class="cd-row"><span class="cd-label">研究备注</span><div class="cd-value">${item.notes}</div></div>`); let html = rows.join(''); if (item.story) { const paras = String(item.story).split('\n\n').filter(Boolean).map(p => `<p>${p}</p>`).join(''); html += `<div class="containment-story"><div class="story-title">📖 相关记录</div>${paras}</div>`; } return html; }
+function renderContainmentNotice() { const wrap = document.getElementById('containmentNotice'); if (!wrap) return; const items = CONTAINMENT_ITEMS || []; const redacted = items.filter(i => i.redacted).length; const latest = items.filter(i => !i.redacted).slice(-2).reverse(); const latestText = latest.map(i => `${i.name}（${i.id}·${formatLevel(i.level).label}）`).join('；'); wrap.innerHTML = `<span class="cn-ico">📢</span><span class="cn-text"><b>近期录入</b>：${latestText || '—'}；另有 <b class="blink">${redacted}</b> 份档案已加密，暂不可调阅。</span>`; }
+function renderContainmentTypeTabs() { const wrap = document.getElementById('containmentCatTabs'); if (!wrap) return; const items = CONTAINMENT_ITEMS || []; const typeNames = [...new Set(items.map(i => (i.type || '未分类').split('（')[0].trim()))]; const all = ['全部'].concat(typeNames); wrap.innerHTML = all.map(t => { const key = t === '全部' ? 'all' : t; const count = key === 'all' ? items.length : items.filter(i => (i.type || '').split('（')[0].trim() === key).length; return `<button class="containment-cat-tab${activeContainmentType === key ? ' active' : ''}" data-type="${key}">${t}<small>${count}</small></button>`; }).join(''); wrap.querySelectorAll('.containment-cat-tab').forEach(btn => { btn.addEventListener('click', () => { activeContainmentType = btn.dataset.type; renderContainmentList(); }); }); }
+function renderContainmentList() { const list = document.getElementById('containmentList'); if (!list) return; renderContainmentNotice(); renderContainmentTypeTabs(); let items = CONTAINMENT_ITEMS || []; if (activeContainmentType !== 'all') items = items.filter(i => (i.type || '未分类').split('（')[0].trim() === activeContainmentType); if (!items.length) { list.innerHTML = '<div class="containment-empty">该分类暂无收容物登记。</div>'; return; } list.innerHTML = items.map(item => { const lv = formatLevel(item.level); if (item.redacted) { return `
+        <div class="containment-card containment-redacted" data-id="${item.id}">
+            <div class="containment-head">
+                <span class="containment-id">${item.id}</span>
+                <span class="containment-level ${lv.cls}">${lv.label}</span>
+            </div>
+            <div class="containment-name">${item.name}</div>
+            <div class="containment-summary redacted-bar">████ 档案内容已加密 · 需二级以上权限调阅 ████</div>
+            <div class="containment-meta"><span>持有者：<span class="redacted">[已涂黑]</span></span><span>状态：${item.status || '密'}</span></div>
+            <div class="containment-lock">🔒 该档案不可调阅</div>
+        </div>`; } const hasDetail = !!(item.appearance || item.mechanism || item.restrictions || item.events || item.status || item.notes || item.story); return `
+        <div class="containment-card" data-id="${item.id}">
+            <div class="containment-head">
+                <span class="containment-id">${item.id}</span>
+                <span class="containment-level ${lv.cls}">${lv.label}</span>
+            </div>
+            <div class="containment-name">${item.name}</div>
+            <div class="containment-summary">${containmentSummary(item)}</div>
+            <div class="containment-meta"><span>持有者：${item.holder || '无'}</span><span>类型：${item.type || '未分类'}</span></div>
+            ${hasDetail ? `<button class="containment-expand-btn" type="button">展开详情 ▾</button>
+            <div class="containment-detail">${renderContainmentDetail(item)}</div>` : ''}
+        </div>`; }).join('');
+    list.querySelectorAll('.containment-expand-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const card = this.closest('.containment-card'); if (!card) return;
+            const detail = card.querySelector('.containment-detail'); if (!detail) return;
+            const isOpen = detail.classList.contains('open');
+            list.querySelectorAll('.containment-card .containment-detail.open').forEach(d => { if (d !== detail) { d.classList.remove('open'); const b = d.closest('.containment-card') && d.closest('.containment-card').querySelector('.containment-expand-btn'); if (b) b.textContent = '展开详情 ▾'; } });
+            if (isOpen) { detail.classList.remove('open'); this.textContent = '展开详情 ▾'; }
+            else { detail.classList.add('open'); this.textContent = '收起详情 ▴'; }
+        });
+    });
+}
+function renderCommBoard() { const list = document.getElementById('commPostList'); if(!INTERNAL_BOARDS || INTERNAL_BOARDS.length === 0) { list.innerHTML = '<div>暂无总局内部通讯。</div>'; return; } list.innerHTML = INTERNAL_BOARDS.map(item => ` <div style="padding:12px;border-bottom:1px solid var(--border-color);"> <div style="font-weight:bold;">📌 ${item.title}${item.dept ? `<span class="dept-badge">${item.dept}</span>` : ''}</div> <div style="color:var(--text-secondary);font-size:0.9rem;margin:6px 0;padding:6px 0;border-bottom:1px solid var(--border-color);">${item.content}</div> <div style="color:var(--accent-red);font-family:'Comic Sans MS',cursive;font-size:0.95rem;border-left:3px solid var(--accent-red);padding-left:10px;">✍ 【批注】${item.comment}</div> </div> `).join(''); }
 function renderInternalPosts() { document.getElementById('internalPostList').innerHTML = internalPosts.slice().reverse().map(p => `<div class="admin-item" style="padding:10px;border-bottom:1px solid var(--border-color);"><span>${p.title}</span><small style="color:var(--text-muted);">${p.author}</small><button onclick="showInternalPostDetail('${p.id}')" style="color:var(--accent-red);float:right;border:1px solid var(--border-color);padding:2px 8px;">查看</button></div>`).join(''); }
 window.showInternalPostDetail = function(id) { currentInternalPostId = id; const post = internalPosts.find(p => p.id === id); if (!post) return; document.getElementById('internalPostList').style.display = 'none'; document.getElementById('internalPostDetail').style.display = 'block'; document.getElementById('internalPostContent').innerHTML = `<h3>${post.title}</h3><div style="color:var(--text-muted);font-size:0.8rem;">${post.author} · ${post.timestamp}</div><p style="margin:15px 0;">${post.content}</p>${(post.comments||[]).map(c => `<div style="border-top:1px solid var(--border-color);padding:10px 0;"><strong>${c.user}</strong>: ${c.text}</div>`).join('')}`; };
 document.getElementById('internalBackBtn').addEventListener('click', () => { document.getElementById('internalPostDetail').style.display = 'none'; document.getElementById('internalPostList').style.display = 'grid'; renderInternalPosts(); });
 document.getElementById('internalNewPostBtn').addEventListener('click', () => { const title = safePrompt('标题：'); if (!title || !title.trim()) return; const content = safePrompt('内容：'); if (!content || !content.trim()) return; internalPosts.push({ id:'ip'+Date.now(), title: title.trim(), content: content.trim(), author: window.currentUser ? window.currentUser.name : '匿名', timestamp:new Date().toLocaleString('zh-CN'), comments:[] }); safeSet('xuju_internal_posts', internalPosts); renderInternalPosts(); });
 document.getElementById('internalCommentBtn').addEventListener('click', () => { const text = document.getElementById('internalCommentInput').value.trim(); if (!text) return; const post = internalPosts.find(p => p.id === currentInternalPostId); if (!post) return; post.comments.push({ user: window.currentUser ? window.currentUser.name : '匿名', text, time:new Date().toLocaleString('zh-CN') }); safeSet('xuju_internal_posts', internalPosts); window.showInternalPostDetail(currentInternalPostId); });
 
+function formatMissionLevel(risk) { const map = { red:'己阶', amber:'辛阶', blue:'壬阶', purple:'庚阶' }; const cls = { red:'lv-ji', amber:'lv-xin', blue:'lv-ren', purple:'lv-geng' }; return { label: map[risk] || '未定级', cls: cls[risk] || 'lv-xin' }; }
 function renderMissions() {
-    document.getElementById('missionsList').innerHTML = missions.map(m => `
+    document.getElementById('missionsList').innerHTML = missions.map(m => {
+        const ml = formatMissionLevel(m.risk);
+        return `
         <div class="mission-item">
             <div class="mission-head">
                 <div class="mission-title">${m.title}</div>
                 <span class="mission-status">${m.status}</span>
             </div>
-            <div class="mission-meta"><span class="mission-tag">${m.risk}</span>截止：${m.deadline}</div>
+            <div class="mission-meta"><span class="mission-tag ${ml.cls}">${ml.label}</span>截止：${m.deadline}</div>
+            ${m.dept ? `<div class="mission-dept">主管司局：<span class="dept-badge">${m.dept}</span></div>` : ''}
             <div class="mission-desc">${m.desc}</div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 function renderLingshi() {
     const channelMap = {
@@ -1182,6 +1261,195 @@ const WELCOME_MESSAGES = [
 ];
 function startTypewriter() { const el = document.getElementById('typewriterText'); const msg = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)]; el.textContent = ''; let i=0; const t = setInterval(() => { if(i<msg.length) el.textContent += msg.charAt(i++); else clearInterval(t); }, 60); }
 
+// ============ 🏛️ 总局六大司局 ============
+function renderBureau() {
+    const grid = document.getElementById('bureauDeptGrid');
+    if (!grid) return;
+    grid.innerHTML = (BUREAU_DEPARTMENTS || []).map(d => `
+        <div class="bureau-dept-card">
+            <div class="bureau-dept-head">
+                <span class="bureau-dept-icon">${d.icon}</span>
+                <div>
+                    <div class="bureau-dept-name">${d.name}</div>
+                    <div class="bureau-dept-id">${d.id}</div>
+                </div>
+            </div>
+            <div class="bureau-dept-func">${d.func}</div>
+            <div class="bureau-dept-status"><span class="status-dot"></span>${d.status}</div>
+        </div>
+    `).join('');
+}
+
+// ============ 🧪 实验记录（SCP 风格） ============
+function experimentTag(rec) {
+    const n = (rec.notes || '') + (rec.result || '');
+    if (n.indexOf('事故') !== -1) return { label: '事故', cls: 'tag-accident' };
+    if (n.indexOf('意外') !== -1) return { label: '意外', cls: 'tag-incident' };
+    return { label: '正常', cls: 'tag-normal' };
+}
+function renderExperimentRecords() {
+    const list = document.getElementById('experimentList');
+    if (!list) return;
+    const records = EXPERIMENT_RECORDS || [];
+    list.innerHTML = records.map(rec => {
+        const tag = experimentTag(rec);
+        return `
+        <div class="record-item">
+            <div class="record-head">
+                <span class="record-no">${rec.expNo}</span>
+                <span class="record-item-name">${rec.item}</span>
+                <span class="record-tag ${tag.cls}">${tag.label}</span>
+            </div>
+            <div class="record-meta"><span>实验人员：${rec.personnel}</span><span>日期：${rec.date}</span></div>
+            <div class="record-purpose">目的：${rec.purpose}</div>
+            <button class="record-expand-btn" type="button">展开实验详情 ▾</button>
+            <div class="record-detail">
+                <div class="record-block"><h4>实验过程</h4><div class="record-steps">${rec.steps.map(s => `<div class="record-step">${s}</div>`).join('')}</div></div>
+                <div class="record-block"><h4>实验结果</h4><p>${rec.result}</p></div>
+                <div class="record-block"><h4>结论</h4><p>${rec.conclusion}</p></div>
+                <div class="record-block"><h4>备注</h4><p class="record-notes">${rec.notes}</p></div>
+            </div>
+        </div>`;
+    }).join('');
+    list.querySelectorAll('.record-expand-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const item = this.closest('.record-item'); if (!item) return;
+            const detail = item.querySelector('.record-detail'); if (!detail) return;
+            const isOpen = detail.classList.contains('open');
+            list.querySelectorAll('.record-item .record-detail.open').forEach(d => {
+                if (d !== detail) { d.classList.remove('open'); const b = d.closest('.record-item') && d.closest('.record-item').querySelector('.record-expand-btn'); if (b) b.textContent = '展开实验详情 ▾'; }
+            });
+            if (isOpen) { detail.classList.remove('open'); this.textContent = '展开实验详情 ▾'; }
+            else { detail.classList.add('open'); this.textContent = '收起实验详情 ▴'; }
+        });
+    });
+}
+
+// ============ 👻 异化体图鉴 ============
+function renderEntities() {
+    const list = document.getElementById('entityList');
+    if (!list) return;
+    const entities = CONTAINMENT_ENTITIES || [];
+    list.innerHTML = entities.map(ent => {
+        const lv = formatLevel(ent.level);
+        return `
+        <div class="entity-card">
+            <div class="entity-head">
+                <span class="entity-id">${ent.id}</span>
+                <span class="entity-level ${lv.cls}">${lv.label}</span>
+            </div>
+            <div class="entity-name">${ent.name}<span class="entity-cls">${ent.cls}</span></div>
+            <button class="entity-expand-btn" type="button">展开形态详情 ▾</button>
+            <div class="entity-detail">
+                <div class="entity-block"><h4>形态描述</h4><p>${ent.appearance}</p></div>
+                <div class="entity-block"><h4>行为模式</h4><p>${ent.behavior}</p></div>
+                <div class="entity-block"><h4>弱点</h4><ul class="entity-weak">${ent.weaknesses.map(w => `<li>${w}</li>`).join('')}</ul></div>
+                <div class="entity-block"><h4>首次发现</h4><p>${ent.firstFound}</p></div>
+                <div class="entity-block"><h4>关联收容物</h4><p class="entity-related">${ent.related}</p></div>
+            </div>
+        </div>`;
+    }).join('');
+    list.querySelectorAll('.entity-expand-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const card = this.closest('.entity-card'); if (!card) return;
+            const detail = card.querySelector('.entity-detail'); if (!detail) return;
+            const isOpen = detail.classList.contains('open');
+            list.querySelectorAll('.entity-card .entity-detail.open').forEach(d => {
+                if (d !== detail) { d.classList.remove('open'); const b = d.closest('.entity-card') && d.closest('.entity-card').querySelector('.entity-expand-btn'); if (b) b.textContent = '展开形态详情 ▾'; }
+            });
+            if (isOpen) { detail.classList.remove('open'); this.textContent = '展开形态详情 ▾'; }
+            else { detail.classList.add('open'); this.textContent = '收起形态详情 ▴'; }
+        });
+    });
+}
+
+// ============ ⚔️ 收容行动记录 ============
+function renderActionRecords() {
+    const list = document.getElementById('actionList');
+    if (!list) return;
+    const records = ACTION_RECORDS || [];
+    list.innerHTML = records.map(rec => `
+        <div class="action-item">
+            <div class="action-head">
+                <span class="action-id">${rec.id}</span>
+                <span class="action-codename">行动代号「${rec.codename}」</span>
+            </div>
+            <div class="action-meta"><span>执行单位：${rec.unit}</span></div>
+            <div class="action-meta"><span>行动日期：${rec.date}</span><span>地点：${rec.location}</span></div>
+            <button class="action-expand-btn" type="button">展开行动详情 ▾</button>
+            <div class="action-detail">
+                <div class="action-block"><h4>参与人员</h4><div class="action-members">${rec.members.map(m => `<span class="action-member">${m}</span>`).join('')}</div></div>
+                <div class="action-block"><h4>行动目标</h4><p>${rec.objective}</p></div>
+                <div class="action-block"><h4>行动背景</h4><p>${rec.background}</p></div>
+                <div class="action-block"><h4>行动过程</h4><div class="action-timeline">${rec.timeline.map(t => `<div class="action-tl-item">${t}</div>`).join('')}</div></div>
+                <div class="action-block"><h4>战斗损伤</h4><p>${rec.damage}</p></div>
+                <div class="action-block"><h4>结论</h4><p>${rec.conclusion}</p></div>
+                <div class="action-block"><h4>备注</h4><p class="action-notes">${rec.notes}</p></div>
+            </div>
+        </div>
+    `).join('');
+    list.querySelectorAll('.action-expand-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const item = this.closest('.action-item'); if (!item) return;
+            const detail = item.querySelector('.action-detail'); if (!detail) return;
+            const isOpen = detail.classList.contains('open');
+            list.querySelectorAll('.action-item .action-detail.open').forEach(d => {
+                if (d !== detail) { d.classList.remove('open'); const b = d.closest('.action-item') && d.closest('.action-item').querySelector('.action-expand-btn'); if (b) b.textContent = '展开行动详情 ▾'; }
+            });
+            if (isOpen) { detail.classList.remove('open'); this.textContent = '展开行动详情 ▾'; }
+            else { detail.classList.add('open'); this.textContent = '收起行动详情 ▴'; }
+        });
+    });
+}
+
+// ============ ⌨️ 面板快捷键 + 主页内嵌切换 ============
+const NAV_KEYMAP = { '1':'home','2':'monitor','3':'containment','4':'archive','5':'experiment','6':'entities','7':'action','8':'lingshi','9':'profile' };
+function bindKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        if (!NAV_KEYMAP[e.key]) return;
+        const term = document.getElementById('terminalContainer');
+        if (!term || term.style.display !== 'block') return;
+        const tag = (e.target && e.target.tagName) || '';
+        if (['INPUT','TEXTAREA','SELECT'].indexOf(tag) !== -1 || (e.target && e.target.isContentEditable)) return;
+        switchPanel(NAV_KEYMAP[e.key]);
+    });
+}
+function renderHomeEmbed(panel) {
+    const embed = document.getElementById('homeEmbed');
+    if (!embed) return;
+    document.querySelectorAll('#homeIndexGrid .index-card').forEach(c => c.classList.toggle('active', c.dataset.panel === panel));
+    const openBtn = (p, label) => `<button class="embed-open" data-panel="${p}">进入完整 ${label} →</button>`;
+    let html = '';
+    if (panel === 'bureau') {
+        html = `<div class="embed-head"><span class="embed-title">🏛 总局架构 · 六大司局</span>${openBtn('bureau', '面板')}</div>
+            <div class="bureau-dept-grid">${(BUREAU_DEPARTMENTS || []).map(d => `
+                <div class="bureau-dept-card">
+                    <div class="bureau-dept-head"><span class="bureau-dept-icon">${d.icon}</span><div><div class="bureau-dept-name">${d.name}</div><div class="bureau-dept-id">${d.id}</div></div></div>
+                    <div class="bureau-dept-func">${d.func}</div>
+                    <div class="bureau-dept-status"><span class="status-dot"></span>${d.status}</div>
+                </div>`).join('')}</div>`;
+    } else if (panel === 'commBoard') {
+        html = `<div class="embed-head"><span class="embed-title">✉ 总局通讯</span>${openBtn('commBoard', '面板')}</div>
+            <div class="embed-list">${(INTERNAL_BOARDS || []).map(item => `
+                <div class="embed-item"><div class="embed-item-title">📌 ${item.title}${item.dept ? `<span class="dept-badge">${item.dept}</span>` : ''}</div>
+                <div class="embed-item-body">${item.content}</div>
+                <div class="embed-item-comment">✍ 【批注】${item.comment}</div></div>`).join('') || '<div class="embed-item">暂无通讯记录。</div>'}</div>`;
+    } else if (panel === 'internalForum') {
+        html = `<div class="embed-head"><span class="embed-title">▣ 司内议室</span>${openBtn('internalForum', '面板')}</div>
+            <div class="embed-list">${(internalPosts || []).slice().reverse().map(p => `
+                <div class="embed-item"><div class="embed-item-title">📌 ${p.title}</div>
+                <div class="embed-item-meta">${p.author} · ${p.timestamp} · ${(p.comments || []).length} 条回复</div></div>`).join('') || '<div class="embed-item">暂无内部帖子。</div>'}</div>`;
+    } else if (panel === 'missions') {
+        html = `<div class="embed-head"><span class="embed-title">☒ 悬赏榜</span>${openBtn('missions', '面板')}</div>
+            <div class="embed-list">${(missions || []).map(m => { const ml = formatMissionLevel(m.risk); return `
+                <div class="embed-item"><div class="embed-item-title">📌 ${m.title}<span class="mission-tag ${ml.cls}">${ml.label}</span></div>
+                <div class="embed-item-meta">截止：${m.deadline} · ${m.status}${m.dept ? ` · <span class="dept-badge">${m.dept}</span>` : ''}</div>
+                <div class="embed-item-body">${m.desc}</div></div>`; }).join('') || '<div class="embed-item">暂无悬赏委托。</div>'}</div>`;
+    }
+    embed.innerHTML = html;
+    embed.querySelectorAll('.embed-open').forEach(b => b.addEventListener('click', () => switchPanel(b.dataset.panel)));
+}
+
 // ============ 初始化 ============
 try {
     startStars();
@@ -1189,5 +1457,8 @@ try {
     renderFeaturedPosts();
     renderPostList();
     document.getElementById('dailyFortune').textContent = getDailyFortune();
+    updateForumStatus();
+    setInterval(updateForumStatus, 30000);
+    bindKeyboardShortcuts();
     updatePortalStatus();
 } catch(e) { console.error('初始化失败:', e); }

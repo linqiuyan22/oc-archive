@@ -8,9 +8,22 @@
 </head>
 <body>
     <div id="terminalLoading" class="terminal-loading" style="display:none;">
-        <img src="images/dragon-logo.png" onerror="this.style.display='none'" alt="龙纹" style="width: 120px; height: 120px; margin-bottom: 30px;">
-        <div class="loading-text" id="loadingText">正在建立灵枢链接... <span id="percentText">0%</span></div>
-        <div class="pixel-progress"><span id="loadingBar"></span></div>
+        <div class="load-ring-wrap">
+            <svg class="load-ring" viewBox="0 0 160 160">
+                <defs>
+                    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#ff7a7a"></stop>
+                        <stop offset="100%" stop-color="#cf2a2a"></stop>
+                    </linearGradient>
+                </defs>
+                <circle class="ring-track" cx="80" cy="80" r="72"></circle>
+                <circle class="ring-bar" id="ringBar" cx="80" cy="80" r="72"></circle>
+            </svg>
+            <img src="images/dragon-logo.png" onerror="this.style.display='none'" alt="龙纹" class="load-logo">
+        </div>
+        <div class="load-pct" id="percentText">0%</div>
+        <div class="load-status" id="loadingText">正在建立灵枢链接…</div>
+        <div class="load-hint">终端 ID: QYXH-2026-001 · 链路加密中</div>
     </div>
 
     <!-- 暗巷论坛 -->
@@ -42,15 +55,19 @@
         </div>
 
         <div class="featured-posts-section">
+            <div class="featured-head">
+                <span class="featured-title">巷中精选</span>
+                <span class="featured-sub">精华热帖 · 左右滑动查看</span>
+            </div>
             <div class="featured-posts-slider" id="featuredSlider"></div>
         </div>
 
         <div class="board-tabs">
-            <button class="board-tab active" data-board="all">全部</button>
-            <button class="board-tab" data-board="灵异见闻">灵异见闻</button>
-            <button class="board-tab" data-board="巷中秘闻">巷中秘闻</button>
-            <button class="board-tab" data-board="求助解惑">求助解惑</button>
-            <button class="board-tab" data-board="民俗考据">民俗考据</button>
+            <button class="board-tab active" data-board="all"><span class="tab-ico">◉</span>全部</button>
+            <button class="board-tab" data-board="灵异见闻"><span class="tab-ico">👁️</span>灵异见闻</button>
+            <button class="board-tab" data-board="巷中秘闻"><span class="tab-ico">🌫️</span>巷中秘闻</button>
+            <button class="board-tab" data-board="求助解惑"><span class="tab-ico">🕯️</span>求助解惑</button>
+            <button class="board-tab" data-board="民俗考据"><span class="tab-ico">📜</span>民俗考据</button>
         </div>
 
         <div class="forum-body">
@@ -61,7 +78,7 @@
                     <div class="forum-user-stats">
                         <span><b id="totalPosts">0</b>帖子</span>
                         <span><b>∞</b>用户</span>
-                        <span><b class="blink">13</b>在线</span>
+                        <span><b class="blink" id="onlineCount">13</b>在线</span>
                     </div>
                 </div>
                 <div class="sidebar-box checkin-box">
@@ -82,14 +99,13 @@
                         <div class="forum-totem-caption">巷 · 守夜人</div>
                     </div>
                 </div>
-                <div class="sidebar-box">
-                    <h4>板块导航</h4>
-                    <ul id="boardStats" class="board-stats">
-                        <li data-board="灵异见闻">灵异见闻 <span class="stat-num">0</span></li>
-                        <li data-board="巷中秘闻">巷中秘闻 <span class="stat-num">0</span></li>
-                        <li data-board="求助解惑">求助解惑 <span class="stat-num">0</span></li>
-                        <li data-board="民俗考据">民俗考据 <span class="stat-num">0</span></li>
-                    </ul>
+                <div class="sidebar-box sidebar-status">
+                    <h4>论坛动态</h4>
+                    <div class="status-line"><span>当前在线</span><b class="blink" id="onlineCountDetail">13</b><span>人</span></div>
+                    <div class="status-line"><span>今日新帖</span><b id="todayNewPosts">0</b><span>帖</span></div>
+                    <div class="status-line status-line-col"><span>最热话题</span><div id="hotTopic" class="hot-topic">加载中…</div></div>
+                    <div class="status-sub">正在浏览 · 在线用户</div>
+                    <ul id="onlineUsers" class="online-users"></ul>
                 </div>
                 <div class="sidebar-box">
                     <h4>每日一签</h4>
@@ -104,6 +120,7 @@
             <main class="forum-main">
                 <section id="postListView">
                     <div id="postList" class="post-list"></div>
+                    <div id="postPagination" class="post-pagination"></div>
                 </section>
                 <section id="postDetailView" class="post-detail-container detail-overlay" style="display:none;">
                     <button class="back-btn" id="backToListBtn">← 返回</button>
@@ -196,20 +213,21 @@
                     <span id="topAdminBadge" style="display:none;color:#cf2a2a;">[管理员]</span>
                     <span class="audio-indicator" id="audioIndicator">🔇</span>
                 </div>
-                <nav class="main-nav">
-                    <button class="nav-btn active" data-panel="home"><span class="nav-ico">⌂</span>主页</button>
-                    <button class="nav-btn" data-panel="monitor"><span class="nav-ico">◎</span>监测</button>
-                    <button class="nav-btn" data-panel="containment"><span class="nav-ico">▤</span>收容物</button>
-                    <button class="nav-btn" data-panel="commBoard"><span class="nav-ico">✉</span>通讯</button>
-                    <button class="nav-btn" data-panel="archive"><span class="nav-ico">☰</span>档案</button>
-                    <button class="nav-btn" data-panel="lingshi"><span class="nav-ico">◈</span>灵犀</button>
-                    <button class="nav-btn" data-panel="internalForum"><span class="nav-ico">▣</span>议室</button>
-                    <button class="nav-btn" data-panel="missions"><span class="nav-ico">☒</span>悬赏</button>
-                    <button class="nav-btn" data-panel="profile"><span class="nav-ico">◉</span>个人</button>
-                    <button class="nav-btn admin-only" data-panel="admin" style="display:none;"><span class="nav-ico">⚙</span>管理</button>
-                    <button class="nav-btn logout-btn-top" id="logoutTopBtn"><span class="nav-ico">⏻</span>断开</button>
-                </nav>
             </header>
+            <nav class="main-nav">
+                <span class="nav-notch" title="灵枢链接稳定"></span>
+                <button class="nav-btn active" data-panel="home"><span class="nav-ico">⌂</span>主页</button>
+                <button class="nav-btn" data-panel="monitor"><span class="nav-ico">◎</span>监测</button>
+                <button class="nav-btn" data-panel="containment"><span class="nav-ico">▤</span>收容物</button>
+                <button class="nav-btn" data-panel="archive"><span class="nav-ico">☰</span>档案</button>
+                <button class="nav-btn" data-panel="experiment"><span class="nav-ico">⚗</span>实验</button>
+                <button class="nav-btn" data-panel="entities"><span class="nav-ico">✦</span>图鉴</button>
+                <button class="nav-btn" data-panel="action"><span class="nav-ico">⚔</span>行动</button>
+                <button class="nav-btn" data-panel="lingshi"><span class="nav-ico">◈</span>灵犀</button>
+                <button class="nav-btn" data-panel="profile"><span class="nav-ico">◉</span>个人</button>
+                <button class="nav-btn admin-only" data-panel="admin" style="display:none;"><span class="nav-ico">⚙</span>管理</button>
+                <button class="nav-btn logout-btn-top" id="logoutTopBtn"><span class="nav-ico">⏻</span>断开</button>
+            </nav>
 
             <div class="panel-container">
                 <div class="panel" id="monitorPanel">
@@ -244,12 +262,12 @@
                         <div class="sig-node sig-node-a" data-site="临江">
                             <span class="sig-node-dot"></span>
                             <span class="sig-node-name">临江</span>
-                            <span class="sig-node-tag">Keter·空间坍缩</span>
+                            <span class="sig-node-tag">己阶·空间坍缩</span>
                         </div>
                         <div class="sig-node sig-node-b" data-site="沧溟">
                             <span class="sig-node-dot"></span>
                             <span class="sig-node-name">沧溟</span>
-                            <span class="sig-node-tag">Euclid·模因污染</span>
+                            <span class="sig-node-tag">辛阶·模因污染</span>
                         </div>
                         <div class="sig-node sig-node-c" data-site="旧纸厂">
                             <span class="sig-node-dot"></span>
@@ -267,7 +285,24 @@
                         </div>
                     </div>
                 </div>
-                <div class="panel" id="containmentPanel"><div class="scp-header"><span>📁 收容物库</span><button onclick="switchPanel('archive')" class="admin-btn" style="margin-left:auto; border:1px solid #e03e3e; color:#e03e3e; padding: 2px 10px;">去档案</button></div><div id="containmentList" class="archive-list"></div></div>
+                <div class="panel" id="containmentPanel">
+                    <div class="scp-header">
+                        <span>📁 收容物库</span>
+                        <span class="scp-hint">在册 / 在逃 · 22 件登记</span>
+                        <button onclick="switchPanel('archive')" class="admin-btn go-archive-btn">去档案 →</button>
+                    </div>
+                    <div class="containment-notice" id="containmentNotice"></div>
+                    <div class="containment-legend">
+                        <span class="legend-item"><span class="legend-dot lv-ren"></span>壬阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-xin"></span>辛阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-geng"></span>庚阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-ji"></span>己阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-wu"></span>戊阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-ding"></span>丁阶</span>
+                    </div>
+                    <div class="containment-cat-tabs" id="containmentCatTabs"></div>
+                    <div id="containmentList" class="containment-list"></div>
+                </div>
                 <div class="panel" id="commBoardPanel"><div class="scp-header"><span>✉ 总局通讯</span></div><div id="commPostList" class="missions-list"></div></div>
 
                 <div class="panel active" id="homePanel">
@@ -276,34 +311,44 @@
                         <div class="home-alert-card">
                             <div class="announce-title">📢 总局公告</div>
                             <div class="announce-body">
-                                <p>· 认知污染监测网升级完成，覆盖范围扩展至旧城区全域</p>
-                                <p>· 旧城区巡线区段已重新锁定，外勤三队例行巡检中</p>
-                                <p>· 编号 LC-Q-039「天极」已完成例行灵质校准</p>
-                                <p>· 请各司局于本周五前提交一季度认知污染处置报告</p>
-                                <p>· 梧桐巷民俗社观测点能量读数平稳，维持长期观测</p>
+                                <p>· 监测预警司：旧城区巡线区段已重新锁定，外勤三队例行巡检中</p>
+                                <p>· 玄理科研院：编号 LC-Q-039「天极」已完成例行灵质校准，十三骨效果表已下发各小队</p>
+                                <p>· 玄理科研院：新一期《实验记录》已归档——「逢雨」「灵枢」「天极」「落羽」「狂骨」例行实验完成，含事故备案 2 起、意外 3 起</p>
+                                <p>· 监测预警司：《异化体图鉴》更新至 9 类，新增「井底之物」「引路伪物」观测条目，请外勤阅毕签收</p>
+                                <p>· 收容物保管司：通报——LC-W-045「纸嫁衣」已自殡葬店事件现场回收，庚阶管控，禁止外借</p>
+                                <p>· 外勤行动司：行动代号「归影」已完结——无主之影回收完成，旧纸厂片区风险等级下调</p>
+                                <p>· 认知防护司：请各司局于本周五前提交一季度认知污染处置报告</p>
+                                <p>· 认知防护司：提醒——凡夜间巡逻，随身携带旧伞、银针、桃木片，三样缺一不可</p>
+                                <p>· 外勤行动司：提示——梧桐巷西段路面裂缝扩大，请市民绕行，勿在裂缝上驻足</p>
+                                <p>· 监测预警司：梧桐巷民俗社观测点能量读数平稳，维持长期观测</p>
+                                <p>· 玄理科研院：本月已完成「墟门」片区首次低频探测，报告待局内复核</p>
+                                <p>· 认知防护司：密级提示——涉及「三院」「墟门」等关键词的公开讨论，请各员注意尺度</p>
+                                <p>· 觉醒者管理司：下周起恢复每周四晚觉醒者锚点例行自检，请各小队按时上报</p>
                             </div>
                         </div>
                         <div class="home-map-card">
                             <img src="images/hand-map.jpg" alt="区域地图">
                             <div class="map-overlay"></div>
+                            <div class="map-grid"></div>
+                            <div class="map-scanline"></div>
+                            <div class="map-sweep"></div>
+                            <div class="map-ripple"></div>
+                            <span class="map-marker" style="left:30%;top:38%;"></span>
+                            <span class="map-marker" style="left:62%;top:55%;"></span>
+                            <span class="map-marker" style="left:48%;top:70%;"></span>
+                            <span class="map-marker" style="left:74%;top:30%;"></span>
                             <div class="map-label">区域扫描</div>
                             <div class="map-pulse"></div>
                         </div>
                     </div>
-                    <div class="home-notice-strip" aria-label="快捷通知">
-                        <button class="notice-card" data-target="monitor"><span>区域扫描</span><small>进入监测</small></button>
-                        <button class="notice-card" data-target="archive" data-category="事件分支"><span>旧巷档案</span><small>查看事件记录</small></button>
-                        <button class="notice-card" data-target="commBoard"><span>总局通讯</span><small>内部通告</small></button>
-                        <button class="notice-card" data-target="containment"><span>收容名单</span><small>监控对象</small></button>
-                        <button class="notice-card" data-target="lingshi"><span>灵犀广播</span><small>班组对话</small></button>
-                    </div>
                     <div class="terminal-fortune"><span class="fortune-label">今日一签</span><span id="terminalFortuneText"></span></div>
-                    <div class="home-index-grid">
-                        <div class="index-card" data-cat="墟界管理档案"><span class="index-ico">✧</span><span>墟界管理</span><small>管控总则</small></div>
-                        <div class="index-card" data-cat="叛逃人员档案"><span class="index-ico">◉</span><span>叛逃人员</span><small>通缉追踪</small></div>
-                        <div class="index-card" data-cat="收容物分支"><span class="index-ico">▤</span><span>收容物</span><small>异常名录</small></div>
-                        <div class="index-card" data-cat="事件分支"><span class="index-ico">☉</span><span>事件</span><small>异常记录</small></div>
+                    <div class="home-index-grid" id="homeIndexGrid">
+                        <div class="index-card active" data-panel="bureau"><span class="index-ico">☯</span><span>总局架构</span><small>六大司局</small></div>
+                        <div class="index-card" data-panel="commBoard"><span class="index-ico">✉</span><span>总局通讯</span><small>内部通告</small></div>
+                        <div class="index-card" data-panel="internalForum"><span class="index-ico">▣</span><span>司内议室</span><small>内部讨论</small></div>
+                        <div class="index-card" data-panel="missions"><span class="index-ico">☒</span><span>悬赏榜</span><small>外勤委托</small></div>
                     </div>
+                    <div class="home-embed" id="homeEmbed"></div>
                 </div>
 
                 <div class="panel" id="archivePanel">
@@ -345,6 +390,34 @@
                     </div>
                     <div class="profile-section"><h3>📌 收藏</h3><div id="favList"></div></div>
                     <div class="profile-section"><h3>🕓 最近</h3><div id="historyList"></div></div>
+                </div>
+                <div class="panel" id="bureauPanel">
+                    <div class="scp-header"><span>🏛 总局架构 · 六大司局</span><span class="scp-hint">墟管局 · 内部组织</span></div>
+                    <div class="bureau-intro">墟界管理局下设六大司局，统筹全国墟域监测、收容、科研与认知防护工作。各司局向总局长汇报，遇重大墟域事件联合响应。</div>
+                    <div class="bureau-dept-grid" id="bureauDeptGrid"></div>
+                </div>
+                <div class="panel" id="experimentPanel">
+                    <div class="scp-header"><span>🧪 实验记录</span><span class="scp-hint">玄理科研院 · SCP 风格 · 16 条</span></div>
+                    <div class="record-legend">
+                        <span class="legend-tag tag-accident">事故</span>
+                        <span class="legend-tag tag-incident">意外</span>
+                        <span class="legend-tag tag-normal">正常</span>
+                    </div>
+                    <div id="experimentList" class="record-list"></div>
+                </div>
+                <div class="panel" id="entitiesPanel">
+                    <div class="scp-header"><span>👻 异化体图鉴</span><span class="scp-hint">中式恐怖 · 9 类登记</span></div>
+                    <div class="containment-legend">
+                        <span class="legend-item"><span class="legend-dot lv-ren"></span>壬阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-xin"></span>辛阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-geng"></span>庚阶</span>
+                        <span class="legend-item"><span class="legend-dot lv-ji"></span>己阶</span>
+                    </div>
+                    <div id="entityList" class="entity-list"></div>
+                </div>
+                <div class="panel" id="actionPanel">
+                    <div class="scp-header"><span>⚔ 收容行动记录</span><span class="scp-hint">外勤三处 · 5 起</span></div>
+                    <div id="actionList" class="action-list"></div>
                 </div>
                 <div class="panel" id="adminPanel">
                     <div class="admin-controls">
