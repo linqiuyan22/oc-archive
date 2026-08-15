@@ -198,52 +198,144 @@ function startStars() {
 }
 
 // ============ 双音乐播放器系统 ============
+let forumTrackIdx = 0;
 function setupForumMiniPlayer() {
     const audio = document.getElementById('forumAudio');
     const sourceEl = document.getElementById('forumAudioSource');
-    if (!sourceEl || !audio) {
-        console.warn("未找到论坛音频元素，跳过初始化。");
-        return; 
-    }
-    
     const btn = document.getElementById('forumMiniPlayBtn');
+    const prevBtn = document.getElementById('forumPrevBtn');
+    const nextBtn = document.getElementById('forumNextBtn');
+    const statusText = document.getElementById('forumStatusText');
     const actionText = document.getElementById('forumActionText');
+    const disc = document.getElementById('forumVinylDisc');
     const playerContainer = document.getElementById('forumVinylPlayer');
-    if (!FORUM_AUDIO_SRC) { if(playerContainer) playerContainer.style.opacity = '0.4'; return; }
-    
-    sourceEl.src = FORUM_AUDIO_SRC; audio.volume = 0.3;
+    if (!audio || !sourceEl || !btn) return;
+    if (!LOCAL_TRACKS || !LOCAL_TRACKS.length) { if (playerContainer) playerContainer.style.opacity = '0.4'; return; }
+    const setTrack = (i) => {
+        if (!LOCAL_TRACKS.length) return;
+        forumTrackIdx = ((i % LOCAL_TRACKS.length) + LOCAL_TRACKS.length) % LOCAL_TRACKS.length;
+        const t = LOCAL_TRACKS[forumTrackIdx];
+        sourceEl.src = t.file;
+        if (disc) disc.src = t.cover || disc.src;
+        if (statusText) { statusText.textContent = t.title; statusText.title = t.title; }
+        audio.load();
+        if (!audio.paused) audio.play().catch(() => {});
+    };
+    setTrack(0);
+    audio.volume = 0.3;
     btn.addEventListener('click', () => {
         if (audio.paused) {
-            audio.play().then(() => {
-                playerContainer.classList.add('playing'); actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸';
-            }).catch(() => {});
-        } else {
-            audio.pause(); playerContainer.classList.remove('playing'); actionText.textContent = '[ 暂停 ]'; btn.textContent = '▶';
-        }
-    });
-}
-
-function setupMiniTerminalPlayer() {
-    const audio = document.getElementById('bgAudio');
-    const sourceEl = document.getElementById('audioSource');
-    const btn = document.getElementById('miniPlayBtn');
-    const actionText = document.getElementById('actionText');
-    const playerContainer = document.getElementById('vinylPlayer');
-    if (!audio || !sourceEl || !btn || !playerContainer) {
-        console.warn('未找到终端音频元素，跳过初始化。');
-        return;
-    }
-    if (!TERMINAL_AUDIO_SRC) { playerContainer.style.opacity = '0.4'; return; }
-    sourceEl.src = TERMINAL_AUDIO_SRC; audio.volume = 0.3;
-    btn.addEventListener('click', () => {
-        if (audio.paused) {
-            audio.play().then(() => {
-                playerContainer.classList.add('playing'); if (actionText) actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸';
-            }).catch(() => {});
+            audio.play().then(() => { playerContainer.classList.add('playing'); if (actionText) actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸'; }).catch(() => {});
         } else {
             audio.pause(); playerContainer.classList.remove('playing'); if (actionText) actionText.textContent = '[ 暂停 ]'; btn.textContent = '▶';
         }
     });
+    if (prevBtn) prevBtn.addEventListener('click', () => setTrack(forumTrackIdx - 1));
+    if (nextBtn) nextBtn.addEventListener('click', () => setTrack(forumTrackIdx + 1));
+    bindNcmPlayer('forum');
+}
+
+let terminalTrackIdx = 0;
+function setupMiniTerminalPlayer() {
+    const audio = document.getElementById('bgAudio');
+    const sourceEl = document.getElementById('audioSource');
+    const btn = document.getElementById('miniPlayBtn');
+    const prevBtn = document.getElementById('miniPrevBtn');
+    const nextBtn = document.getElementById('miniNextBtn');
+    const statusText = document.getElementById('statusText');
+    const actionText = document.getElementById('actionText');
+    const disc = document.getElementById('vinylDisc');
+    const playerContainer = document.getElementById('vinylPlayer');
+    if (!audio || !sourceEl || !btn) return;
+    if (!LOCAL_TRACKS || !LOCAL_TRACKS.length) { if (playerContainer) playerContainer.style.opacity = '0.4'; return; }
+    const setTrack = (i) => {
+        if (!LOCAL_TRACKS.length) return;
+        terminalTrackIdx = ((i % LOCAL_TRACKS.length) + LOCAL_TRACKS.length) % LOCAL_TRACKS.length;
+        const t = LOCAL_TRACKS[terminalTrackIdx];
+        sourceEl.src = t.file;
+        if (disc) disc.src = t.cover || disc.src;
+        if (statusText) { statusText.textContent = t.title; statusText.title = t.title; }
+        audio.load();
+        if (!audio.paused) audio.play().catch(() => {});
+    };
+    setTrack(0);
+    audio.volume = 0.3;
+    btn.addEventListener('click', () => {
+        if (audio.paused) {
+            audio.play().then(() => { playerContainer.classList.add('playing'); if (actionText) actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸'; }).catch(() => {});
+        } else {
+            audio.pause(); playerContainer.classList.remove('playing'); if (actionText) actionText.textContent = '[ 暂停 ]'; btn.textContent = '▶';
+        }
+    });
+    if (prevBtn) prevBtn.addEventListener('click', () => setTrack(terminalTrackIdx - 1));
+    if (nextBtn) nextBtn.addEventListener('click', () => setTrack(terminalTrackIdx + 1));
+    bindNcmPlayer('mini', 'terminal');
+}
+
+// ============ ☁ 网易云外链播放器 ============
+function ncmFrame(type, id) {
+    const t = type === 'playlist' ? 0 : 2;
+    const h = type === 'playlist' ? 340 : 66;
+    return 'https://music.163.com/outchain/player?type=' + t + '&id=' + encodeURIComponent(id) + '&auto=0&height=' + h;
+}
+function bindNcmPlayer(prefix, presetKey) {
+    const pop = document.getElementById(prefix + 'NcmPop');
+    const btn = document.getElementById(prefix + 'NcmBtn');
+    const closeBtn = document.getElementById(prefix + 'NcmClose');
+    const input = document.getElementById(prefix + 'NcmId');
+    const typeSel = document.getElementById(prefix + 'NcmType');
+    const goBtn = document.getElementById(prefix + 'NcmGo');
+    const frame = document.getElementById(prefix + 'NcmFrame');
+    const list = document.getElementById(prefix + 'NcmList');
+    const nowTitle = document.getElementById(prefix + 'NcmNowTitle');
+    const nowLink = document.getElementById(prefix + 'NcmNowLink');
+    if (!pop || !btn) return;
+    // 播放单曲 / 歌单
+    const playSong = (id, name) => {
+        if (frame) { frame.removeAttribute('loading'); frame.src = ncmFrame('song', id); frame.style.display = 'block'; }
+        if (nowTitle) nowTitle.textContent = '正在播放：' + (name || '网易云单曲');
+        if (nowLink) { nowLink.href = 'https://music.163.com/#/song?id=' + id; nowLink.style.display = 'inline'; }
+        const m = safeGetJSON('darkalley_ncm', {}); m[prefix] = id; m[prefix + '_type'] = 'song'; safeSet('darkalley_ncm', m);
+        if (input) input.value = id;
+        if (typeSel) typeSel.value = 'song';
+    };
+    const playPlaylist = (id) => {
+        if (frame) { frame.removeAttribute('loading'); frame.src = ncmFrame('playlist', id); frame.style.display = 'block'; }
+        if (nowTitle) nowTitle.textContent = '正在播放歌单 #' + id;
+        if (nowLink) { nowLink.href = 'https://music.163.com/#/playlist?id=' + id; nowLink.style.display = 'inline'; }
+        const m = safeGetJSON('darkalley_ncm', {}); m[prefix] = id; m[prefix + '_type'] = 'playlist'; safeSet('darkalley_ncm', m);
+        if (input) input.value = id;
+        if (typeSel) typeSel.value = 'playlist';
+    };
+    // 预置鹰角歌曲列表（可点击播放）
+    if (list && NCM_PRESET_TRACKS && NCM_PRESET_TRACKS.length) {
+        list.innerHTML = NCM_PRESET_TRACKS.map((t, i) => `<button class="ncm-track" data-id="${t.id}" data-name="${t.name}" type="button">${i + 1}. ${t.name}</button>`).join('');
+        list.querySelectorAll('.ncm-track').forEach(b => b.addEventListener('click', () => playSong(b.dataset.id, b.dataset.name)));
+    }
+    // 打开浮层时才恢复上次/预置播放（避免页面加载即请求网易云，且不依赖 lazy）
+    const pre = (NCM_PRESETS && NCM_PRESETS[presetKey || prefix]) || { type: 'song', id: '' };
+    const ncmMem = safeGetJSON('darkalley_ncm', {});
+    const saved = ncmMem[prefix] || pre.id;
+    const savedType = ncmMem[prefix + '_type'] || pre.type;
+    if (input) input.value = saved;
+    if (typeSel) typeSel.value = savedType;
+    let restored = false;
+    const restore = () => {
+        if (restored || !saved) return;
+        restored = true;
+        if (savedType === 'playlist') playPlaylist(saved); else playSong(saved);
+    };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); pop.classList.toggle('open'); if (pop.classList.contains('open')) restore(); });
+    if (closeBtn) closeBtn.addEventListener('click', () => pop.classList.remove('open'));
+    const go = () => {
+        const id = (input ? input.value : '').trim();
+        const type = typeSel ? typeSel.value : 'song';
+        if (!id) return;
+        restored = true;
+        if (type === 'playlist') playPlaylist(id); else playSong(id);
+    };
+    if (goBtn) goBtn.addEventListener('click', go);
+    if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
 }
 
 // ============ 论坛渲染 ============

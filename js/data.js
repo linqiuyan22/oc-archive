@@ -33,6 +33,28 @@ const FEATURED_POSTS = [
 // ============ 音频配置 ============
 const FORUM_AUDIO_SRC = 'audio/forum.mp3';
 const TERMINAL_AUDIO_SRC = 'audio/forum.mp3';
+// 本地音乐列表（可自行添加 mp3：把文件放进 audio/ 并在此登记，即可用 ‹ › 切歌）
+const LOCAL_TRACKS = [
+    { title: '雨夜巷声 · 环境', file: 'audio/forum.mp3', cover: 'images/island-cover.jpg' }
+];
+// 网易云预置歌曲列表（鹰角/明日方舟·塞壬唱片-MSR，可点击播放单曲）
+const NCM_PRESET_TRACKS = [
+    { id: '3417228038', name: 'Sparkling Days' },
+    { id: '3417228039', name: 'A Secluded Path' },
+    { id: '3413071606', name: '用不上的雨刷' },
+    { id: '3413072220', name: '直到大地变成一颗酸橙' },
+    { id: '3413071607', name: '路标晃悠悠' },
+    { id: '3413071608', name: '坠入天空' },
+    { id: '3413072221', name: '星海间的呼吸' },
+    { id: '3413072222', name: '梦与梦的同频' },
+    { id: '3413072223', name: '水枪生死斗' },
+    { id: '3413072224', name: '连烦恼也融入天空' }
+];
+// 网易云外链预置（首次打开浮层时自动播放，可输入修改，记忆到 localStorage）
+const NCM_PRESETS = {
+    forum: { type: 'song', id: '3417228038' },   // Sparkling Days
+    terminal: { type: 'song', id: '3413071606' } // 用不上的雨刷
+};
 
 // ============ 每日一签 ============
 const DAILY_FORTUNES = [

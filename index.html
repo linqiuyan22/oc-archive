@@ -57,7 +57,22 @@
                     <span id="forumStatusText">环境音</span>
                     <span id="forumActionText">[ 暂停 ]</span>
                 </div>
+                <button id="forumPrevBtn" class="mini-nav-btn" title="上一首">‹</button>
                 <button id="forumMiniPlayBtn" class="mini-play-btn">▶</button>
+                <button id="forumNextBtn" class="mini-nav-btn" title="下一首">›</button>
+                <button id="forumNcmBtn" class="ncm-toggle" title="网易云外链">☁</button>
+            </div>
+            <div class="ncm-pop" id="forumNcmPop">
+                <div class="ncm-head"><span>☁ 鹰角 · 塞壬唱片</span><button id="forumNcmClose" class="ncm-close" type="button">✕</button></div>
+                <div class="ncm-now"><span id="forumNcmNowTitle">点击下方曲目播放</span><a id="forumNcmNowLink" href="#" target="_blank" rel="noopener" style="display:none;">在网易云打开 ↗</a></div>
+                <div id="forumNcmList" class="ncm-list"></div>
+                <div class="ncm-row">
+                    <select id="forumNcmType"><option value="song">单曲</option><option value="playlist">歌单</option></select>
+                    <input id="forumNcmId" placeholder="自定义 网易云 ID" maxlength="20">
+                    <button id="forumNcmGo" class="ncm-go" type="button">▶</button>
+                </div>
+                <div class="ncm-tip">ID 获取：网易云网页版 → 分享歌曲/歌单 → 复制链接 → 里面的数字</div>
+                <iframe id="forumNcmFrame" class="ncm-frame" style="display:none;" title="网易云播放器" frameborder="0"></iframe>
             </div>
         </div>
 
@@ -556,7 +571,22 @@
             </div>
             <div class="player-controls">
                 <div class="track-info"><span id="statusText">环境声</span><span id="actionText">[ 暂停 ]</span></div>
+                <button id="miniPrevBtn" class="mini-nav-btn" title="上一首">‹</button>
                 <button id="miniPlayBtn" class="mini-play-btn">▶</button>
+                <button id="miniNextBtn" class="mini-nav-btn" title="下一首">›</button>
+                <button id="miniNcmBtn" class="ncm-toggle" title="网易云外链">☁</button>
+            </div>
+            <div class="ncm-pop" id="miniNcmPop">
+                <div class="ncm-head"><span>☁ 鹰角 · 塞壬唱片</span><button id="miniNcmClose" class="ncm-close" type="button">✕</button></div>
+                <div class="ncm-now"><span id="miniNcmNowTitle">点击下方曲目播放</span><a id="miniNcmNowLink" href="#" target="_blank" rel="noopener" style="display:none;">在网易云打开 ↗</a></div>
+                <div id="miniNcmList" class="ncm-list"></div>
+                <div class="ncm-row">
+                    <select id="miniNcmType"><option value="song">单曲</option><option value="playlist">歌单</option></select>
+                    <input id="miniNcmId" placeholder="自定义 网易云 ID" maxlength="20">
+                    <button id="miniNcmGo" class="ncm-go" type="button">▶</button>
+                </div>
+                <div class="ncm-tip">ID 获取：网易云网页版 → 分享歌曲/歌单 → 复制链接 → 里面的数字</div>
+                <iframe id="miniNcmFrame" class="ncm-frame" style="display:none;" title="网易云播放器" frameborder="0"></iframe>
             </div>
         </div>
     </div>

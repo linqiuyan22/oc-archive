@@ -1583,3 +1583,52 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
 }
 .action-link:hover { background: rgba(130,95,220,0.2); color: #d8c9f0; border-color: #9f7fe0; }
 #archiveActionView .scp-header { margin-bottom: 10px; }
+
+/* 🎵 播放器升级：切歌 + 网易云外链 */
+.mini-nav-btn {
+    background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color);
+    width: 22px; height: 22px; border-radius: 50%; font-size: 0.9rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0;
+}
+.mini-nav-btn:hover { color: var(--accent-red); border-color: var(--accent-red); }
+.ncm-toggle {
+    background: transparent; color: #b39ddb; border: 1px solid rgba(130,95,220,0.4);
+    width: 24px; height: 24px; border-radius: 50%; font-size: 0.8rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0;
+}
+.ncm-toggle:hover { color: #9f7fe0; border-color: #9f7fe0; background: rgba(130,95,220,0.15); }
+.ncm-pop {
+    position: absolute; z-index: 9999; width: 342px; max-width: calc(100vw - 20px);
+    background: rgba(10,11,15,0.97); border: 1px solid var(--border-color); border-radius: 12px;
+    padding: 12px 14px; box-shadow: 0 12px 34px rgba(0,0,0,0.65), 0 0 18px rgba(207,42,42,0.12);
+    display: none;
+}
+.ncm-pop.open { display: block; }
+.forum-player .ncm-pop { top: calc(100% + 10px); left: 50%; transform: translateX(-50%); }
+.terminal-player .ncm-pop { bottom: calc(100% + 10px); right: 0; }
+.ncm-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: var(--text-primary); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.04em; }
+.ncm-close { color: var(--text-muted); background: none; border: none; cursor: pointer; font-size: 0.85rem; }
+.ncm-close:hover { color: var(--accent-red); }
+.ncm-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.ncm-row select, .ncm-row input {
+    background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: 6px;
+    padding: 6px 8px; color: var(--text-primary); font-size: 0.75rem;
+}
+.ncm-row select:focus, .ncm-row input:focus { border-color: var(--accent-red); outline: none; }
+.ncm-row input { flex: 1; min-width: 0; }
+.ncm-go { background: var(--accent-red); color: #000; border: none; border-radius: 6px; width: 32px; cursor: pointer; flex-shrink: 0; }
+.ncm-go:hover { box-shadow: 0 0 10px var(--accent-glow); }
+.ncm-tip { font-size: 0.68rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px; }
+.ncm-frame { width: 100%; height: 66px; border: 0; border-radius: 8px; background: rgba(0,0,0,0.3); }
+.ncm-now { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; color: #9f7fe0; margin-bottom: 8px; min-height: 16px; line-height: 1.5; }
+.ncm-now a { color: var(--accent-red); text-decoration: none; }
+.ncm-now a:hover { text-decoration: underline; }
+.ncm-list { display: flex; flex-direction: column; gap: 5px; max-height: 230px; overflow-y: auto; margin-bottom: 10px; padding-right: 2px; }
+.ncm-list::-webkit-scrollbar { width: 5px; }
+.ncm-list::-webkit-scrollbar-thumb { background: rgba(207,42,42,0.45); border-radius: 999px; }
+.ncm-track {
+    text-align: left; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 8px 12px; font-size: 0.78rem; line-height: 1.45; color: var(--text-secondary);
+    cursor: pointer; transition: 0.15s; white-space: normal; overflow-wrap: break-word;
+}
+.ncm-track:hover { border-color: rgba(207,42,42,0.5); color: var(--text-primary); background: rgba(207,42,42,0.06); }
