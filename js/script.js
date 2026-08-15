@@ -1337,7 +1337,7 @@ function renderContainmentList() { const list = document.getElementById('contain
             const isOpen = detail.classList.contains('open');
             list.querySelectorAll('.containment-card .containment-detail.open').forEach(d => { if (d !== detail) { d.classList.remove('open'); const b = d.closest('.containment-card') && d.closest('.containment-card').querySelector('.containment-expand-btn'); if (b) b.textContent = '展开详情 ▾'; } });
             if (isOpen) { detail.classList.remove('open'); this.textContent = '展开详情 ▾'; }
-            else { detail.classList.add('open'); this.textContent = '收起详情 ▴'; }
+            else { detail.classList.add('open'); this.textContent = '收起详情 ▴'; try { detail.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }
         });
     });
 }
@@ -2252,6 +2252,8 @@ try {
         moreBtn.textContent = more.classList.contains('open') ? '△ 收起版块' : '☰ 更多版块';
     });
     updatePortalStatus();
+    // 🛠️ 修复：.modal-overlay 是 fixed，但 .main-container 的 backdrop-filter 会劫持其包含块，导致弹窗随外层滚动上移/消失。移到 body 顶层（body 无 transform/filter），fixed 相对视口正确。
+    document.querySelectorAll('.modal-overlay').forEach(m => { if (m.parentElement && m.parentElement !== document.body) document.body.appendChild(m); });
     const shiChenEl = document.getElementById('shiChen');
     if (shiChenEl) { const updShi = () => shiChenEl.textContent = shiChenLabel(); updShi(); setInterval(updShi, 60000); }
     startForumClock();
