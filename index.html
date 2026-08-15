@@ -7,6 +7,13 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- 动态迷雾背景（3 层，鼠标视差，不干扰内容） -->
+    <div class="fog-bg" aria-hidden="true">
+        <div class="fog fog-1"></div>
+        <div class="fog fog-2"></div>
+        <div class="fog fog-3"></div>
+    </div>
+
     <div id="terminalLoading" class="terminal-loading" style="display:none;">
         <div class="load-ring-wrap">
             <svg class="load-ring" viewBox="0 0 160 160">
@@ -68,6 +75,9 @@
             <button class="board-tab" data-board="巷中秘闻"><span class="tab-ico">🌫️</span>巷中秘闻</button>
             <button class="board-tab" data-board="求助解惑"><span class="tab-ico">🕯️</span>求助解惑</button>
             <button class="board-tab" data-board="民俗考据"><span class="tab-ico">📜</span>民俗考据</button>
+            <button class="folk-entry" data-open="game" type="button"><span class="tab-ico">🎮</span>深夜文游</button>
+            <button class="folk-entry" data-open="collections" type="button"><span class="tab-ico">📚</span>故事合集</button>
+            <button class="folk-entry" data-open="shop" type="button"><span class="tab-ico">🛒</span>巷口杂货</button>
         </div>
 
         <div class="forum-body">
@@ -93,6 +103,7 @@
                     <button id="checkinBtn" class="checkin-btn">☾ 今日签到</button>
                     <div class="checkin-tip" id="checkinTip">签到可得积分，连续签到奖励更多</div>
                 </div>
+                <div class="sidebar-more" id="sidebarMore">
                 <div class="sidebar-box sidebar-totem">
                     <div class="forum-totem-wrap">
                         <img src="images/hesychia-emblem.jpg" alt="暗巷图腾" class="forum-totem" loading="lazy">
@@ -116,11 +127,43 @@
                     <p class="announce-text">本巷为匿名讨论区，请勿暴露真实身份与位置。深夜发帖请谨慎，部分帖子可能被莫名删除。</p>
                     <p class="announce-rule">— 夜路莫回头 —</p>
                 </div>
+                </div>
+                <button class="sidebar-more-btn" id="sidebarMoreBtn" type="button">☰ 更多版块</button>
             </aside>
             <main class="forum-main">
                 <section id="postListView">
                     <div id="postList" class="post-list"></div>
                     <div id="postPagination" class="post-pagination"></div>
+                </section>
+                <section id="forumGameSection" class="forum-view" style="display:none;">
+                    <div class="forum-view-head">
+                        <button class="back-btn" id="gameBackBtn" type="button">← 返回论坛</button>
+                        <span class="forum-view-title">🎮 临川高中 · 学生生存守则</span>
+                    </div>
+                    <div class="game-ui-embed">
+                        <div class="game-topbar">
+                            <button id="gameRulesBtn" class="game-rules-btn" type="button">📜 生存守则</button>
+                            <span class="game-sanity">理智值 <b id="gameSanity">100</b></span>
+                        </div>
+                        <div id="gameRulesPanel" class="game-rules-panel" style="display:none;"></div>
+                        <div class="game-body" id="gameBody"></div>
+                    </div>
+                </section>
+                <section id="forumCollectionSection" class="forum-view" style="display:none;">
+                    <div class="forum-view-head">
+                        <button class="back-btn" id="collectionBackBtn" type="button">← 返回论坛</button>
+                        <span class="forum-view-title">📚 故事合集 <small>追踪同一条线索 · 只收录论坛帖子</small></span>
+                    </div>
+                    <div id="folkCollectionList" class="collection-list"></div>
+                </section>
+                <section id="forumShopSection" class="forum-view" style="display:none;">
+                    <div class="forum-view-head">
+                        <button class="back-btn" id="shopBackBtn" type="button">← 返回论坛</button>
+                        <span class="forum-view-title">🛒 巷口杂货铺 <small>积分兑换</small></span>
+                        <span class="folk-points">我的积分 <b id="forumShopPoints">0</b></span>
+                    </div>
+                    <div class="folk-shop-tabs" id="forumShopCatTabs"></div>
+                    <div id="forumShopList" class="folk-shop-list"></div>
                 </section>
                 <section id="postDetailView" class="post-detail-container detail-overlay" style="display:none;">
                     <button class="back-btn" id="backToListBtn">← 返回</button>
@@ -230,7 +273,7 @@
                 <button class="nav-btn" data-panel="experiment"><span class="nav-ico">⚗</span>实验</button>
                 <button class="nav-btn" data-panel="entities"><span class="nav-ico">✦</span>图鉴</button>
                 <button class="nav-btn" data-panel="action"><span class="nav-ico">⚔</span>行动</button>
-                <button class="nav-btn" data-panel="lingshi"><span class="nav-ico">◈</span>灵犀</button>
+                <button class="nav-btn" data-panel="shop"><span class="nav-ico">◬</span>终端商城</button>                <button class="nav-btn" data-panel="lingshi"><span class="nav-ico">◈</span>灵犀</button>
                 <button class="nav-btn" data-panel="profile"><span class="nav-ico">◉</span>个人</button>
                 <button class="nav-btn admin-only" data-panel="admin" style="display:none;"><span class="nav-ico">⚙</span>管理</button>
                 <button class="nav-btn logout-btn-top" id="logoutTopBtn"><span class="nav-ico">⏻</span>断开</button>
@@ -425,6 +468,33 @@
                 <div class="panel" id="actionPanel">
                     <div class="scp-header"><span>⚔ 收容行动记录</span><span class="scp-hint">外勤三处 · 5 起</span></div>
                     <div id="actionList" class="action-list"></div>
+                </div>
+                <div class="panel" id="collectionsPanel">
+                    <div class="scp-header"><span>📚 故事合集</span><span class="scp-hint">拼图式阅读 · 追踪同一条线索</span></div>
+                    <div id="collectionList" class="collection-list"></div>
+                </div>
+                <div class="panel" id="shopPanel">
+                    <div class="scp-header"><span>🛒 终端商城 · 总局物资部</span><span class="scp-hint">我的积分：<b id="shopPointsTop">0</b></span></div>
+                    <div class="terminal-shop-form" id="listingFormWrap">
+                        <div class="listing-form-head">
+                            <span>🔨 我要出售挂卖</span>
+                            <small>上架后其他同事可用积分购买，售出即得积分</small>
+                        </div>
+                        <div class="listing-form-grid">
+                            <input type="text" id="listName" placeholder="物品名称（如：自制护身符）" maxlength="20">
+                            <input type="text" id="listIco" placeholder="图标 emoji（如 🧿）" maxlength="4">
+                            <input type="number" id="listPrice" placeholder="价格（积分）" min="1" max="9999">
+                            <input type="number" id="listQty" placeholder="数量" min="1" max="99" value="1">
+                        </div>
+                        <input type="text" id="listDesc" placeholder="简要描述" maxlength="60">
+                        <div class="listing-form-actions"><button id="listSubmitBtn" class="admin-btn">上架出售</button></div>
+                    </div>
+                    <div class="shop-cat-tabs" id="shopCatTabs"></div>
+                    <div id="shopList" class="shop-list"></div>
+                    <div class="terminal-my-listings">
+                        <div class="scp-header" style="margin:16px 0 10px;"><span>📦 我的上架</span><span class="scp-hint" id="myListingsHint">0 件在售</span></div>
+                        <div id="myListings" class="shop-list"></div>
+                    </div>
                 </div>
                 <div class="panel" id="adminPanel">
                     <div class="admin-controls">

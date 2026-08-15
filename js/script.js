@@ -427,7 +427,8 @@ function doCheckin() {
     safeSet('darkalley_checkin', checkinState);
     renderCheckin();
     const gained = 10 + Math.min(20, (checkinState.streak - 1) * 2);
-    alert(`☾ 签到成功！\n连签 ${checkinState.streak} 天\n积分 +${gained}（当前 ${checkinState.points}）`);
+    addPoints(gained);
+    alert(`☾ 签到成功！\n连签 ${checkinState.streak} 天\n积分 +${gained}（当前总积分 ${getPoints()}）`);
 }
 if (document.getElementById('checkinBtn')) {
     document.getElementById('checkinBtn').addEventListener('click', doCheckin);
@@ -439,14 +440,10 @@ window.showPostDetail = function(id) {
         console.warn('未找到帖子：', id);
         return;
     }
-    document.getElementById('postListView').style.display = 'none';
-    document.getElementById('newPostForm').style.display = 'none';
-    document.getElementById('forumProfileView').style.display = 'none';
+    markRead('post|' + id);
+    setForumView('postDetailView');
     const detail = document.getElementById('postDetailView');
-    detail.style.display = 'block';
     detail.dataset.currentId = id;
-    // 打开帖子详情时锁定外层滚动，避免穿透误触
-    document.body.style.overflow = 'hidden';
 
     const bodyHtml = post.content
         .split('\n\n')
@@ -553,22 +550,19 @@ function renderComments(post) {
 }
 
 function backToList() {
-    document.getElementById('postDetailView').style.display = 'none';
-    document.getElementById('newPostForm').style.display = 'none';
-    document.getElementById('forumProfileView').style.display = 'none';
-    document.getElementById('postListView').style.display = 'flex';
-    // 关闭详情时恢复外层滚动
-    document.body.style.overflow = '';
+    setForumView('postListView');
     renderPostList();
 }
 
 // ============ 论坛事件绑定 ============
 document.querySelectorAll('.board-tab').forEach(tab => {
     tab.addEventListener('click', () => {
+        if (!tab.dataset.board) return;
         document.querySelectorAll('.board-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         currentBoard = tab.dataset.board;
         currentPostPage = 1;
+        setForumView('postListView');
         renderPostList();
     });
 });
@@ -579,7 +573,7 @@ document.getElementById('submitNewPostBtn').addEventListener('click', () => {
     if (!title || !content) return alert('请填写标题和内容');
     forumPosts.push({ id:'p'+Date.now(), title, content, board, author: forumNickname, timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
     currentPostPage = 1;
-    savePosts(); backToList();
+    addPoints(10); savePosts(); backToList();
 });
 document.getElementById('submitCommentBtn').addEventListener('click', () => {
     const text = document.getElementById('commentInput').value.trim();
@@ -593,7 +587,7 @@ document.getElementById('submitCommentBtn').addEventListener('click', () => {
     document.getElementById('commentInput').placeholder = '说点什么吧...';
     post.comments = post.comments || [];
     post.comments.push({ user: forumNickname, text, time:new Date().toLocaleString('zh-CN'), likes: 0, replyTo });
-    savePosts(); renderComments(post); document.getElementById('commentInput').value = '';
+    addPoints(5); savePosts(); renderComments(post); document.getElementById('commentInput').value = '';
 });
 document.getElementById('cancelReplyBtn').addEventListener('click', () => {
     window.pendingReply = null;
@@ -763,6 +757,8 @@ window.switchPanel = function(name) {
     if (name === 'experiment') renderExperimentRecords();
     if (name === 'entities') renderEntities();
     if (name === 'action') renderActionRecords();
+    if (name === 'collections') renderCollections();
+    if (name === 'shop') renderShop();
 }
 function bindTerminalNav() {
     document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => btn.addEventListener('click', () => switchPanel(btn.dataset.panel)));
@@ -1005,6 +1001,7 @@ function renderArchiveList() {
 
 function openArchiveDetail(item) {
     addHistory(item.id);
+    markRead('archive|' + item.id);
     const modal = document.getElementById('archiveDetailModal');
     const content = document.getElementById('archiveDetailContent');
     if (!modal || !content) return;
@@ -1049,7 +1046,25 @@ function addHistory(id) { if (!window.currentUser) return; const uid = window.cu
 
 function formatLevel(level) { const s = String(level || ''); const map = [ { k:'壬', label:'壬阶', cls:'lv-ren' }, { k:'辛', label:'辛阶', cls:'lv-xin' }, { k:'庚', label:'庚阶', cls:'lv-geng' }, { k:'己', label:'己阶', cls:'lv-ji' }, { k:'戊', label:'戊阶', cls:'lv-wu' }, { k:'丁', label:'丁阶', cls:'lv-ding' } ]; for (const m of map) { if (s.indexOf(m.k) !== -1) return { label: m.label, cls: m.cls }; } return { label: s || '未知', cls: 'lv-xin' }; }
 function containmentSummary(item) { const raw = item.desc || item.appearance || ''; const text = String(raw).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(); return text.length > 50 ? text.slice(0, 50) + '…' : text; }
-function renderContainmentDetail(item) { if (!item) return ''; const rows = []; const add = (label, val) => { if (val) rows.push(`<div class="cd-row"><span class="cd-label">${label}</span><div class="cd-value">${val}</div></div>`); }; add('形态描述', item.appearance); add('作用机制', item.mechanism); add('使用限制与禁忌', item.restrictions); add('关联事件', item.events); add('当前状态', item.status); if (item.notes) rows.push(`<div class="cd-row"><span class="cd-label">研究备注</span><div class="cd-value">${item.notes}</div></div>`); let html = rows.join(''); if (item.story) { const paras = String(item.story).split('\n\n').filter(Boolean).map(p => `<p>${p}</p>`).join(''); html += `<div class="containment-story"><div class="story-title">📖 相关记录</div>${paras}</div>`; } return html; }
+function renderContainmentDetail(item) {
+    if (!item) return '';
+    const rows = [];
+    const add = (label, val) => { if (val) rows.push(`<div class="cd-row"><span class="cd-label">${label}</span><div class="cd-value">${val}</div></div>`); };
+    add('登记编号', item.id); add('定名', item.name); add('危险等级', formatLevel(item.level).label); add('类型', item.type); add('持有者', item.holder); add('来源', item.origin); add('形态描述', item.appearance); add('作用机制', item.mechanism); add('使用限制与禁忌', item.restrictions); add('关联事件', item.events); add('当前状态', item.status);
+    if (item.notes) rows.push(`<div class="cd-row"><span class="cd-label">研究备注</span><div class="cd-value">${item.notes}</div></div>`);
+    let html = rows.join('');
+    if (item.story) { const paras = String(item.story).split('\n\n').filter(Boolean).map(p => `<p>${p}</p>`).join(''); html += `<div class="containment-story"><div class="story-title">📖 相关记录</div>${paras}</div>`; }
+    const exps = (EXPERIMENT_RECORDS || []).filter(e => e.item && item.name && e.item.indexOf(item.name.split('（')[0]) !== -1);
+    if (exps.length) {
+        html += `<div class="containment-exp"><div class="containment-exp-head">🧪 实验记录（${exps.length}）</div><div class="containment-exp-list">` + exps.map(e => `
+            <details class="containment-exp-details"><summary>${e.expNo} · ${e.purpose}</summary>
+                <p><b>实验人员</b>：${e.personnel}</p><p><b>日期</b>：${e.date}</p>
+                <div class="record-steps">${(e.steps || []).map(s => `<div class="record-step">${s}</div>`).join('')}</div>
+                <p><b>结果</b>：${e.result}</p><p><b>结论</b>：${e.conclusion}</p><p class="record-notes">${e.notes}</p>
+            </details>`).join('') + `</div></div>`;
+    }
+    return html;
+}
 function renderContainmentNotice() { const wrap = document.getElementById('containmentNotice'); if (!wrap) return; const items = CONTAINMENT_ITEMS || []; const redacted = items.filter(i => i.redacted).length; const latest = items.filter(i => !i.redacted).slice(-2).reverse(); const latestText = latest.map(i => `${i.name}（${i.id}·${formatLevel(i.level).label}）`).join('；'); wrap.innerHTML = `<span class="cn-ico">📢</span><span class="cn-text"><b>近期录入</b>：${latestText || '—'}；另有 <b class="blink">${redacted}</b> 份档案已加密，暂不可调阅。</span>`; }
 function renderContainmentTypeTabs() { const wrap = document.getElementById('containmentCatTabs'); if (!wrap) return; const items = CONTAINMENT_ITEMS || []; const typeNames = [...new Set(items.map(i => (i.type || '未分类').split('（')[0].trim()))]; const all = ['全部'].concat(typeNames); wrap.innerHTML = all.map(t => { const key = t === '全部' ? 'all' : t; const count = key === 'all' ? items.length : items.filter(i => (i.type || '').split('（')[0].trim() === key).length; return `<button class="containment-cat-tab${activeContainmentType === key ? ' active' : ''}" data-type="${key}">${t}<small>${count}</small></button>`; }).join(''); wrap.querySelectorAll('.containment-cat-tab').forEach(btn => { btn.addEventListener('click', () => { activeContainmentType = btn.dataset.type; renderContainmentList(); }); }); }
 function renderContainmentList() { const list = document.getElementById('containmentList'); if (!list) return; renderContainmentNotice(); renderContainmentTypeTabs(); let items = CONTAINMENT_ITEMS || []; if (activeContainmentType !== 'all') items = items.filter(i => (i.type || '未分类').split('（')[0].trim() === activeContainmentType); if (!items.length) { list.innerHTML = '<div class="containment-empty">该分类暂无收容物登记。</div>'; return; } list.innerHTML = items.map(item => { const lv = formatLevel(item.level); if (item.redacted) { return `
@@ -1085,7 +1100,28 @@ function renderContainmentList() { const list = document.getElementById('contain
         });
     });
 }
-function renderCommBoard() { const list = document.getElementById('commPostList'); if(!INTERNAL_BOARDS || INTERNAL_BOARDS.length === 0) { list.innerHTML = '<div>暂无总局内部通讯。</div>'; return; } list.innerHTML = INTERNAL_BOARDS.map(item => ` <div style="padding:12px;border-bottom:1px solid var(--border-color);"> <div style="font-weight:bold;">📌 ${item.title}${item.dept ? `<span class="dept-badge">${item.dept}</span>` : ''}</div> <div style="color:var(--text-secondary);font-size:0.9rem;margin:6px 0;padding:6px 0;border-bottom:1px solid var(--border-color);">${item.content}</div> <div style="color:var(--accent-red);font-family:'Comic Sans MS',cursive;font-size:0.95rem;border-left:3px solid var(--accent-red);padding-left:10px;">✍ 【批注】${item.comment}</div> </div> `).join(''); }
+function renderCommBoard() {
+    const list = document.getElementById('commPostList');
+    if (!list) return;
+    if (!INTERNAL_BOARDS || !INTERNAL_BOARDS.length) { list.innerHTML = '<div>暂无总局内部通讯。</div>'; return; }
+    list.innerHTML = INTERNAL_BOARDS.map(item => `
+        <div class="letter-card">
+            <div class="letter-head">
+                <span class="letter-secret${(item.secret || '内部') === '绝密' ? ' top' : ''}">【${item.secret || '内部'}】</span>
+                <span class="letter-title">${item.title}</span>
+                <span class="letter-dept">${item.dept || ''}</span>
+            </div>
+            <div class="letter-paper">
+                <div class="letter-salute">呈：各司局 · 经办</div>
+                <div class="letter-body">${item.content}</div>
+                <div class="letter-footer">
+                    <div class="letter-sign">${item.sender || item.dept}<br><span class="letter-date">${item.date || ''}</span></div>
+                    <div class="letter-seal">${item.seal || item.dept}</div>
+                </div>
+            </div>
+            <div class="letter-comment">✍ 【批注】${item.comment}</div>
+        </div>`).join('');
+}
 function renderInternalPosts() { document.getElementById('internalPostList').innerHTML = internalPosts.slice().reverse().map(p => `<div class="admin-item" style="padding:10px;border-bottom:1px solid var(--border-color);"><span>${p.title}</span><small style="color:var(--text-muted);">${p.author}</small><button onclick="showInternalPostDetail('${p.id}')" style="color:var(--accent-red);float:right;border:1px solid var(--border-color);padding:2px 8px;">查看</button></div>`).join(''); }
 window.showInternalPostDetail = function(id) { currentInternalPostId = id; const post = internalPosts.find(p => p.id === id); if (!post) return; document.getElementById('internalPostList').style.display = 'none'; document.getElementById('internalPostDetail').style.display = 'block'; document.getElementById('internalPostContent').innerHTML = `<h3>${post.title}</h3><div style="color:var(--text-muted);font-size:0.8rem;">${post.author} · ${post.timestamp}</div><p style="margin:15px 0;">${post.content}</p>${(post.comments||[]).map(c => `<div style="border-top:1px solid var(--border-color);padding:10px 0;"><strong>${c.user}</strong>: ${c.text}</div>`).join('')}`; };
 document.getElementById('internalBackBtn').addEventListener('click', () => { document.getElementById('internalPostDetail').style.display = 'none'; document.getElementById('internalPostList').style.display = 'grid'; renderInternalPosts(); });
@@ -1498,8 +1534,337 @@ function renderHomeEmbed(panel) {
     embed.querySelectorAll('.embed-open').forEach(b => b.addEventListener('click', () => switchPanel(b.dataset.panel)));
 }
 
+// ============ 🎮 规则怪谈互动游戏（文游） ============
+let gameSanity = 100;
+function startGame() {
+    gameSanity = 100;
+    const s = document.getElementById('gameSanity'); if (s) s.textContent = '100';
+    renderGameScene('start');
+}
+function closeGame() { setForumView('postListView'); renderPostList(); }
+function renderGameScene(id) {
+    const body = document.getElementById('gameBody');
+    const scene = (GAME_SCENES || []).find(s => s.id === id);
+    if (!body || !scene) return;
+    const s = document.getElementById('gameSanity');
+    if (s) s.textContent = Math.max(0, gameSanity);
+    if (scene.isEnd) {
+        if (scene.reward > 0) addPoints(scene.reward);
+        body.innerHTML = `
+            <div class="game-end game-end-${scene.endType || 'bad'}">
+                <h2>${scene.title}</h2>
+                <p class="game-end-desc">${scene.desc}</p>
+                <p class="game-end-reward">${scene.reward > 0 ? '✦ 获得 ' + scene.reward + ' 积分' : '—— 黑夜将你吞没 ——'}</p>
+                <div class="game-end-actions">
+                    <button class="game-btn" id="gameRestartBtn" type="button">↺ 再玩一次</button>
+                    <button class="game-btn ghost" id="gameEndCloseBtn" type="button">✕ 离开校园</button>
+                </div>
+            </div>`;
+        const rb = document.getElementById('gameRestartBtn'); if (rb) rb.addEventListener('click', startGame);
+        const eb = document.getElementById('gameEndCloseBtn'); if (eb) eb.addEventListener('click', closeGame);
+        return;
+    }
+    body.innerHTML = `
+        <div class="game-scene-head"><span class="game-scene-tag">${scene.isStart ? '序章' : '续'}</span><h2>${scene.title}</h2></div>
+        <p class="game-desc">${scene.desc}</p>
+        <div class="game-options">${scene.options.map((o, i) => `<button class="game-option" data-i="${i}" type="button"><span class="opt-num">${i + 1}</span><span class="opt-text">${o.text}</span></button>`).join('')}</div>`;
+    body.querySelectorAll('.game-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const o = scene.options[+btn.dataset.i];
+            gameSanity = Math.max(0, gameSanity + ((o.effect && o.effect.sanity) || 0));
+            if (s) s.textContent = gameSanity;
+            btn.classList.add('chosen');
+            btn.disabled = true;
+            const note = document.createElement('div');
+            note.className = 'game-note';
+            note.textContent = '◆ ' + (o.note || '');
+            body.appendChild(note);
+            setTimeout(() => {
+                if (gameSanity <= 0) { renderGameScene('end_lost'); return; }
+                renderGameScene(o.effect.goto);
+            }, 1500);
+        });
+    });
+}
+function bindGameView() {
+    const back = document.getElementById('gameBackBtn');
+    if (back) back.addEventListener('click', closeGame);
+    const rulesBtn = document.getElementById('gameRulesBtn');
+    const rulesPanel = document.getElementById('gameRulesPanel');
+    if (rulesBtn && rulesPanel) rulesBtn.addEventListener('click', () => {
+        const open = rulesPanel.style.display !== 'none';
+        rulesPanel.style.display = open ? 'none' : 'block';
+        if (!open && !rulesPanel.dataset.filled) {
+            rulesPanel.dataset.filled = '1';
+            rulesPanel.innerHTML = `<div class="game-rules-head">📜 学生生存守则 · 全文</div>` + (GAME_RULES || []).map(r => `<div class="rule-line">${r}</div>`).join('');
+        }
+    });
+}
+
+// ============ 📚 合集系统（仅整合论坛帖子，论坛/终端共用渲染） ============
+function markRead(key) { const set = safeGetJSON('darkalley_readset', {}); set[key] = true; safeSet('darkalley_readset', set); }
+function isRead(key) { return !!safeGetJSON('darkalley_readset', {})[key]; }
+function renderCollectionList(list) {
+    if (!list) return;
+    list.innerHTML = (STORY_COLLECTIONS || []).map(col => {
+        const done = col.items.filter(it => isRead(it.type + '|' + it.id)).length;
+        const total = col.items.length;
+        const pct = Math.round(done / total * 100);
+        return `
+        <div class="collection-card">
+            <div class="collection-head">
+                <span class="collection-ico">${col.icon}</span>
+                <div>
+                    <div class="collection-title">${col.title}</div>
+                    <div class="collection-desc">${col.desc}</div>
+                </div>
+            </div>
+            <div class="collection-progress"><div class="collection-bar" style="width:${pct}%"></div></div>
+            <div class="collection-meta">阅读进度 <b>${done}/${total}</b> · ${pct}%</div>
+            <ul class="collection-items">${col.items.map(it => {
+                const read = isRead(it.type + '|' + it.id);
+                return `<li class="collection-item${read ? ' read' : ''}" data-type="${it.type}" data-id="${it.id}">
+                    <span class="ci-state">${read ? '✔' : '○'}</span><span class="ci-title">${it.title}</span><span class="ci-tag">${it.type === 'post' ? '帖子' : '档案'}</span>
+                </li>`;
+            }).join('')}</ul>
+        </div>`;
+    }).join('');
+    list.querySelectorAll('.collection-item').forEach(li => {
+        li.addEventListener('click', () => {
+            const type = li.dataset.type, id = li.dataset.id;
+            if (type === 'post') { const p = forumPosts.find(x => x.id === id); if (p) showPostDetail(id); }
+            else { const a = archiveData.find(x => x.id === id); if (a) openArchiveDetail(a); }
+        });
+    });
+}
+function renderCollections() { renderCollectionList(document.getElementById('collectionList')); }
+function renderFolkCollections() { renderCollectionList(document.getElementById('folkCollectionList')); }
+
+// ============ 🛒 积分商城（论坛商城 + 终端商城分离） ============
+// 积分/拥有状态按账号存储：论坛游客 → guest，终端员工 → 各自编号（如 ADMIN-001）
+function getPoints() {
+    let m = safeGetJSON('darkalley_points_map', null);
+    if (!m) { const legacy = parseInt(safeGetJSON('darkalley_points', 0), 10) || 0; m = { guest: legacy }; safeSet('darkalley_points_map', m); }
+    const uid = window.currentUser ? window.currentUser.id : 'guest';
+    return m[uid] || 0;
+}
+function addPoints(n) {
+    const m = safeGetJSON('darkalley_points_map', {}) || {};
+    const uid = window.currentUser ? window.currentUser.id : 'guest';
+    m[uid] = (m[uid] || 0) + (n || 0);
+    safeSet('darkalley_points_map', m);
+    return m[uid];
+}
+function addPointsFor(uid, n) {
+    const m = safeGetJSON('darkalley_points_map', {}) || {};
+    m[uid] = (m[uid] || 0) + (n || 0);
+    safeSet('darkalley_points_map', m);
+}
+function getOwned() {
+    let o = safeGetJSON('darkalley_owned_map', null);
+    if (!o) { const legacy = safeGetJSON('darkalley_owned', []); o = { guest: Array.isArray(legacy) ? legacy : [] }; safeSet('darkalley_owned_map', o); }
+    const uid = window.currentUser ? window.currentUser.id : 'guest';
+    return o[uid] || [];
+}
+function ownItem(id) {
+    const o = safeGetJSON('darkalley_owned_map', {}) || {};
+    const uid = window.currentUser ? window.currentUser.id : 'guest';
+    if (!o[uid]) o[uid] = [];
+    if (o[uid].indexOf(id) === -1) { o[uid].push(id); safeSet('darkalley_owned_map', o); }
+}
+function getListings() { const l = safeGetJSON('darkalley_listings', []); return Array.isArray(l) ? l : []; }
+function saveListings(list) { safeSet('darkalley_listings', list || []); }
+let activeShopCat = '全部';
+let activeForumShopCat = '全部';
+
+function shopCardHtml(it, opts) {
+    opts = opts || {};
+    const owned = getOwned();
+    const has = !opts.listing && owned.indexOf(it.id) !== -1;
+    const affordable = getPoints() >= it.price;
+    const mine = opts.listing && it.seller === (window.currentUser ? window.currentUser.id : '');
+    const meta = opts.listing ? `<span class="shop-qty">×${it.qty}</span><span class="shop-seller">${it.sellerName || '匿名'}</span>` : `<span class="shop-cat">${it.cat}</span>`;
+    let btn;
+    if (mine) btn = `<button class="shop-btn mine" data-delist="${it.id}" type="button">下架</button>`;
+    else if (has) btn = `<button class="shop-btn owned" disabled>已拥有</button>`;
+    else if (!affordable) btn = `<button class="shop-btn cant" disabled>✦ ${it.price} 积分</button>`;
+    else btn = `<button class="shop-btn" data-buy="${it.id}" data-listing="${opts.listing ? 1 : 0}" type="button">✦ ${it.price} 积分</button>`;
+    return `
+    <div class="shop-item${mine ? ' mine-item' : ''}">
+        <span class="shop-ico">${it.ico || '📦'}</span>
+        <div class="shop-main">
+            <div class="shop-name">${it.name}${meta}</div>
+            <div class="shop-desc">${it.desc || ''}</div>
+        </div>
+        ${btn}
+    </div>`;
+}
+
+// —— 终端商城（总局物资部 · 内部向：官方物资 + 个人挂卖） ——
+function renderShop() {
+    const top = document.getElementById('shopPointsTop');
+    if (top) top.textContent = getPoints();
+    const tabs = document.getElementById('shopCatTabs');
+    const list = document.getElementById('shopList');
+    if (!tabs || !list) return;
+    const cats = ['全部', '工具', '装备', '权限', '外观', '个人挂卖'];
+    tabs.innerHTML = cats.map(c => `<button class="shop-cat-tab${activeShopCat === c ? ' active' : ''}" data-cat="${c}">${c}</button>`).join('');
+    tabs.querySelectorAll('.shop-cat-tab').forEach(b => b.addEventListener('click', () => { activeShopCat = b.dataset.cat; renderShop(); }));
+    const listings = getListings();
+    const official = activeShopCat === '个人挂卖' ? [] : (TERMINAL_SHOP_ITEMS || []).filter(i => activeShopCat === '全部' || i.cat === activeShopCat);
+    const userItems = (activeShopCat === '全部' || activeShopCat === '个人挂卖') ? listings : [];
+    const html = [...official.map(i => shopCardHtml(i, {})), ...userItems.map(l => shopCardHtml(l, { listing: true }))];
+    list.innerHTML = html.join('') || '<div class="shop-empty">该分类暂无商品</div>';
+    list.querySelectorAll('.shop-btn[data-buy]').forEach(b => b.addEventListener('click', () => buyItem(b.dataset.buy, b.dataset.listing === '1')));
+    list.querySelectorAll('.shop-btn[data-delist]').forEach(b => b.addEventListener('click', () => delistItem(b.dataset.delist)));
+    renderMyListings();
+}
+function buyItem(id, isListing) {
+    if (!window.currentUser) { alert('请先登录终端'); return; }
+    if (isListing) {
+        const listings = getListings();
+        const li = listings.find(x => x.id === id);
+        if (!li) return;
+        if (li.seller === window.currentUser.id) { alert('不能购买自己上架的商品'); return; }
+        if (getPoints() < li.price) { alert('积分不足'); return; }
+        addPoints(-li.price);
+        addPointsFor(li.seller, li.price);
+        li.qty -= 1;
+        saveListings(li.qty <= 0 ? listings.filter(x => x.id !== id) : listings);
+        renderShop();
+        alert('已购买「' + li.name + '」');
+        return;
+    }
+    const it = (TERMINAL_SHOP_ITEMS || []).find(x => x.id === id);
+    if (!it) return;
+    if (getPoints() < it.price) { alert('积分不足'); return; }
+    addPoints(-it.price); ownItem(it.id);
+    renderShop();
+    alert('已兑换「' + it.name + '」');
+}
+function delistItem(id) {
+    const listings = getListings();
+    const li = listings.find(x => x.id === id);
+    if (!li) return;
+    if (li.seller !== (window.currentUser ? window.currentUser.id : '')) return;
+    saveListings(listings.filter(x => x.id !== id));
+    renderShop();
+    alert('已下架「' + li.name + '」');
+}
+function renderMyListings() {
+    const wrap = document.getElementById('myListings');
+    const hint = document.getElementById('myListingsHint');
+    if (!wrap) return;
+    const uid = window.currentUser ? window.currentUser.id : '';
+    const mine = getListings().filter(l => l.seller === uid);
+    if (hint) hint.textContent = mine.length + ' 件在售';
+    wrap.innerHTML = mine.length ? mine.map(l => shopCardHtml(l, { listing: true })).join('') : '<div class="shop-empty">你还没有上架任何商品</div>';
+    wrap.querySelectorAll('.shop-btn[data-delist]').forEach(b => b.addEventListener('click', () => delistItem(b.dataset.delist)));
+    wrap.querySelectorAll('.shop-btn[data-buy]').forEach(b => b.addEventListener('click', () => buyItem(b.dataset.buy, true)));
+}
+function bindListingForm() {
+    const btn = document.getElementById('listSubmitBtn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        if (!window.currentUser) { alert('请先登录终端'); return; }
+        const name = (document.getElementById('listName').value || '').trim();
+        const ico = (document.getElementById('listIco').value || '').trim();
+        const price = parseInt(document.getElementById('listPrice').value, 10);
+        const qty = parseInt(document.getElementById('listQty').value, 10) || 1;
+        const desc = (document.getElementById('listDesc').value || '').trim();
+        if (!name) { alert('请填写物品名称'); return; }
+        if (!price || price < 1) { alert('请填写有效价格'); return; }
+        const listings = getListings();
+        listings.push({ id: 'L' + Date.now(), name, ico: ico || '📦', price, qty: Math.max(1, Math.min(99, qty)), desc, seller: window.currentUser.id, sellerName: window.currentUser.name, ts: Date.now() });
+        saveListings(listings);
+        ['listName', 'listIco', 'listPrice', 'listQty', 'listDesc'].forEach(k => { const el = document.getElementById(k); if (el) el.value = k === 'listQty' ? '1' : ''; });
+        renderShop();
+        alert('已上架「' + name + '」');
+    });
+}
+
+// —— 论坛商城（巷口杂货铺 · 民众向：护身/头像框/皮肤等） ——
+function renderForumShop() {
+    const top = document.getElementById('forumShopPoints');
+    if (top) top.textContent = getPoints();
+    const tabs = document.getElementById('forumShopCatTabs');
+    const list = document.getElementById('forumShopList');
+    if (!tabs || !list) return;
+    const cats = ['全部', '护身', '消耗品', '头像框', '皮肤', '收集品'];
+    tabs.innerHTML = cats.map(c => `<button class="shop-cat-tab${activeForumShopCat === c ? ' active' : ''}" data-cat="${c}">${c}</button>`).join('');
+    tabs.querySelectorAll('.shop-cat-tab').forEach(b => b.addEventListener('click', () => { activeForumShopCat = b.dataset.cat; renderForumShop(); }));
+    const items = (FORUM_SHOP_ITEMS || []).filter(i => activeForumShopCat === '全部' || i.cat === activeForumShopCat);
+    const owned = getOwned();
+    list.innerHTML = items.map(it => {
+        const has = owned.indexOf(it.id) !== -1;
+        const affordable = getPoints() >= it.price;
+        return `
+        <div class="shop-item">
+            <span class="shop-ico">${it.ico}</span>
+            <div class="shop-main">
+                <div class="shop-name">${it.name}<span class="shop-cat">${it.cat}</span></div>
+                <div class="shop-desc">${it.desc}</div>
+            </div>
+            <button class="shop-btn${has ? ' owned' : ''}${!has && !affordable ? ' cant' : ''}" data-id="${it.id}" ${has ? 'disabled' : ''}>${has ? '已拥有' : '✦ ' + it.price + ' 积分'}</button>
+        </div>`;
+    }).join('');
+    list.querySelectorAll('.shop-btn:not([disabled])').forEach(b => b.addEventListener('click', () => {
+        const it = FORUM_SHOP_ITEMS.find(x => x.id === b.dataset.id);
+        if (!it) return;
+        if (getPoints() < it.price) { alert('积分不足'); return; }
+        addPoints(-it.price); ownItem(it.id);
+        renderForumShop();
+        alert('已兑换「' + it.name + '」');
+    }));
+}
+
+// —— 民俗专区（论坛内嵌面板：文游 / 故事合集 / 巷口杂货） ——
+function setForumView(showId) {
+    ['postListView', 'postDetailView', 'newPostForm', 'forumProfileView', 'forumGameSection', 'forumCollectionSection', 'forumShopSection'].forEach(k => {
+        const el = document.getElementById(k);
+        if (el) el.style.display = (k === showId) ? (k === 'postListView' ? 'flex' : 'block') : 'none';
+    });
+    document.body.style.overflow = (showId === 'postDetailView') ? 'hidden' : '';
+}
+function showForumView(id) {
+    setForumView(id);
+    if (id === 'forumGameSection') startGame();
+    if (id === 'forumCollectionSection') renderFolkCollections();
+    if (id === 'forumShopSection') renderForumShop();
+}
+function bindFolkEntries() {
+    document.querySelectorAll('.folk-entry[data-open]').forEach(b => b.addEventListener('click', () => {
+        const o = b.dataset.open;
+        document.querySelectorAll('.board-tab').forEach(t => t.classList.remove('active'));
+        if (o === 'game') showForumView('forumGameSection');
+        else if (o === 'shop') showForumView('forumShopSection');
+        else if (o === 'collections') showForumView('forumCollectionSection');
+    }));
+    ['gameBackBtn', 'collectionBackBtn', 'shopBackBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('click', () => { setForumView('postListView'); renderPostList(); });
+    });
+}
+
+// ============ 🌫️ 动态迷雾背景（鼠标视差） ============
+function initFog() {
+    const fogs = document.querySelectorAll('.fog');
+    if (!fogs.length) return;
+    window.addEventListener('mousemove', (e) => {
+        const x = (e.clientX / window.innerWidth - 0.5) * 2;
+        const y = (e.clientY / window.innerHeight - 0.5) * 2;
+        if (fogs[0]) fogs[0].style.transform = `translate(${x * 14}px, ${y * 8}px)`;
+        if (fogs[1]) fogs[1].style.transform = `translate(${x * -22}px, ${y * -12}px)`;
+        if (fogs[2]) fogs[2].style.transform = `translate(${x * 30}px, ${y * 16}px)`;
+    });
+}
+
 // ============ 初始化 ============
 try {
+    initFog();
+    bindGameView();
+    bindFolkEntries();
+    bindListingForm();
     startStars();
     setupForumMiniPlayer();
     renderFeaturedPosts();
@@ -1508,5 +1873,11 @@ try {
     updateForumStatus();
     setInterval(updateForumStatus, 30000);
     bindKeyboardShortcuts();
+    const moreBtn = document.getElementById('sidebarMoreBtn');
+    if (moreBtn) moreBtn.addEventListener('click', () => {
+        const more = document.getElementById('sidebarMore');
+        more.classList.toggle('open');
+        moreBtn.textContent = more.classList.contains('open') ? '△ 收起版块' : '☰ 更多版块';
+    });
     updatePortalStatus();
 } catch(e) { console.error('初始化失败:', e); }

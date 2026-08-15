@@ -299,8 +299,9 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
 .back-btn {
     position: sticky; top: 0; z-index: 30; display: inline-block;
     color: var(--text-secondary); margin-bottom: 14px;
-    background: rgba(10,12,16,0.92); padding: 8px 16px; border-radius: 999px;
-    border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(8px); transition: 0.2s;
+    background: #0c0e11; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid rgba(207,42,42,0.35);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5); transition: 0.2s;
 }
 .back-btn:hover { color: var(--text-primary); border-color: var(--accent-red); }
 .back-to-list {
@@ -308,6 +309,9 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
     border: 1px solid rgba(207,42,42,0.4); border-radius: 999px; padding: 8px 22px; transition: 0.2s;
 }
 .back-to-list:hover { background: rgba(207,42,42,0.1); }
+/* 侧栏折叠（桌面完整展示，移动端折叠） */
+.sidebar-more { display: block; }
+.sidebar-more-btn { display: none; }
 .forum-footer { padding: 24px 10px 10px; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
 .forum-footer p + p { margin-top: 6px; }
 
@@ -1098,10 +1102,16 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
     .home-visual-layout { grid-template-columns: 1fr; }
     .home-alert-card, .home-map-card { height: 270px; }
     .home-embed { padding: 12px; }
-    /* 手机端：帖子详情弹层全屏，返回按钮吸顶随时可用 */
+    /* 手机端：帖子详情弹层全屏，返回按钮作为不透明顶栏吸顶，避免与正文透字冲突 */
     .detail-overlay { width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; top: 0; left: 0; transform: none; border-radius: 0; border: none; }
-    .post-detail-container { max-height: 100dvh; padding: 16px 14px; }
-    .back-btn { padding: 10px 20px; font-size: 0.85rem; }
+    .post-detail-container { max-height: 100dvh; padding: 0 0 12px; }
+    .back-btn {
+        display: flex; align-items: center; gap: 6px; width: 100%; margin: 0 0 12px;
+        padding: 12px 16px; border-radius: 0; border-left: none; border-right: none; border-top: none;
+        background: #0b0d10; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+    .post-detail-header { padding: 0 14px; }
+    .post-detail-body { padding: 0 14px; }
     .post-detail-body p { font-size: 0.92rem; }
     .scp-header { flex-wrap: wrap; gap: 8px; }
     /* 手机端：档案区改为纵向堆叠，避免固定侧栏撑爆卡片 */
@@ -1110,6 +1120,29 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
     .archive-grid { grid-template-columns: 1fr; }
     .archive-nav-tabs { overflow-x: auto; flex-wrap: nowrap; }
     .archive-nav-tabs .cat-tab { white-space: nowrap; }
+    /* 手机端论坛美化：更透气、不拥挤 */
+    .forum-header { padding-bottom: 10px; margin-bottom: 14px; }
+    .forum-logo { font-size: 1.5rem; }
+    .board-tabs { overflow-x: auto; flex-wrap: nowrap; padding: 10px 12px; }
+    .board-tab { white-space: nowrap; }
+    /* 侧栏折叠：只留用户卡+签到，其余点开 */
+    .sidebar-more { display: none; }
+    .sidebar-more.open { display: block; }
+    .sidebar-more-btn { display: block; width: 100%; margin: 2px 0 12px; color: var(--accent-red); border: 1px solid rgba(207,42,42,0.35); border-radius: 999px; padding: 9px; background: rgba(207,42,42,0.05); }
+    .forum-sidebar .sidebar-box { padding: 12px 14px; margin-bottom: 10px; }
+    /* 帖子卡：左图右文小封面，内容更透气 */
+    .post-item { flex-direction: row; padding: 12px 14px; gap: 12px; }
+    .post-cover { width: 92px; height: 92px; flex-shrink: 0; border-radius: 8px; }
+    .post-title { font-size: 1rem; }
+    .post-content-preview { -webkit-line-clamp: 2; font-size: 0.85rem; }
+    .post-list { gap: 12px; }
+    /* 精华帖缩小 */
+    .featured-post-card { min-width: 220px; height: 140px; }
+    /* 终端主页更透气 */
+    .announce-body p { line-height: 1.8; }
+    .home-index-grid { gap: 10px; }
+    .index-card { padding: 14px 8px; }
+    .home-embed { padding: 12px 12px; }
 }
 
 /* 💎 统一唱片灵动岛播放器 */
@@ -1294,3 +1327,225 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
 .action-timeline { display: flex; flex-direction: column; gap: 6px; border-left: 2px solid rgba(207,42,42,0.35); padding-left: 14px; }
 .action-tl-item { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; position: relative; }
 .action-tl-item::before { content: ''; position: absolute; left: -19px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-red); box-shadow: 0 0 6px rgba(207,42,42,0.8); }
+
+/* 🌫️ 动态迷雾背景（3层，鼠标视差，不干扰内容） */
+.fog-bg { position: fixed; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+.fog {
+    position: absolute; inset: -25%;
+    background-image:
+        radial-gradient(ellipse 60% 40% at 30% 40%, rgba(255,255,255,0.06), transparent 60%),
+        radial-gradient(ellipse 50% 35% at 70% 30%, rgba(255,255,255,0.05), transparent 60%),
+        radial-gradient(ellipse 55% 45% at 50% 70%, rgba(255,255,255,0.06), transparent 60%);
+    opacity: 0.65; transition: transform 0.18s ease-out;
+}
+.fog-1 { animation: fogDrift 90s linear infinite; }
+.fog-2 { animation: fogDrift 150s linear infinite reverse; opacity: 0.45; }
+.fog-3 { animation: fogDrift 210s linear infinite; opacity: 0.3; }
+@keyframes fogDrift { 0% { background-position: 0 0; } 100% { background-position: 1400px 500px; } }
+
+/* 🎮 规则怪谈互动游戏 · 深夜校园 */
+.game-entry-wrap { margin: 0 0 20px; }
+.game-entry {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px; font-size: 0.95rem; color: var(--accent-red);
+    border: 1px dashed rgba(207,42,42,0.45); border-radius: 12px;
+    background: linear-gradient(160deg, rgba(10,12,16,0.9), rgba(5,5,8,0.92));
+    transition: 0.25s; letter-spacing: 0.06em;
+}
+.game-entry small { color: var(--text-muted); font-size: 0.72rem; letter-spacing: 0.1em; }
+.game-entry:hover { border-color: var(--accent-red); box-shadow: 0 0 18px rgba(207,42,42,0.2); }
+.game-overlay {
+    position: fixed; inset: 0; z-index: 9990; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 30%, rgba(22,18,30,0.95), rgba(4,4,8,0.98) 70%);
+    backdrop-filter: blur(6px); padding: 16px;
+}
+.game-ui {
+    width: min(560px, 94vw); max-height: 88vh; display: flex; flex-direction: column;
+    background: #0a0a10; border: 1px solid rgba(130,95,220,0.25); border-radius: 16px; overflow: hidden;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8), 0 0 24px rgba(90,60,140,0.18);
+}
+.game-topbar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgba(130,95,220,0.2); background: rgba(22,18,32,0.6); }
+.game-title { flex: 1; font-size: 0.9rem; color: #d8c9f0; letter-spacing: 0.08em; font-weight: 700; }
+.game-sanity { font-size: 0.78rem; color: var(--text-secondary); }
+.game-sanity b { color: #9f7fe0; font-size: 1rem; }
+.game-close { color: var(--text-muted); font-size: 1rem; padding: 2px 8px; border-radius: 6px; }
+.game-close:hover { color: var(--accent-red); }
+.game-body { padding: 20px 18px; overflow-y: auto; }
+.game-scene-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.game-scene-tag { font-size: 0.7rem; color: #9f7fe0; border: 1px solid rgba(130,95,220,0.4); border-radius: 999px; padding: 2px 10px; letter-spacing: 0.1em; }
+.game-scene-head h2 { font-size: 1.15rem; color: #fff; }
+.game-desc { color: #c8c0d8; line-height: 1.9; font-size: 0.9rem; margin-bottom: 18px; }
+.game-options { display: flex; flex-direction: column; gap: 10px; }
+.game-option {
+    display: flex; align-items: center; gap: 12px; text-align: left;
+    padding: 12px 14px; border: 1px solid rgba(130,95,220,0.25); border-radius: 10px;
+    background: rgba(30,24,44,0.5); color: #e6ddf5; font-size: 0.88rem; transition: 0.2s;
+}
+.game-option:hover:not(:disabled) { border-color: #9f7fe0; background: rgba(52,42,72,0.6); transform: translateX(3px); }
+.game-option .opt-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(130,95,220,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #d8c9f0; flex-shrink: 0; }
+.game-option.chosen { opacity: 0.6; border-color: rgba(130,95,220,0.5); }
+.game-note { margin: 12px 0 0; color: #b39ddb; font-size: 0.82rem; font-style: italic; border-left: 2px solid #9f7fe0; padding-left: 10px; animation: gameFadeIn 0.4s ease; }
+@keyframes gameFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.game-end { text-align: center; padding: 20px 6px; }
+.game-end h2 { color: #fff; font-size: 1.4rem; margin-bottom: 14px; letter-spacing: 0.08em; }
+.game-end-desc { color: #c8c0d8; line-height: 1.9; font-size: 0.9rem; margin-bottom: 16px; }
+.game-end-reward { color: #ffd97a; font-size: 0.9rem; margin-bottom: 20px; }
+.game-end-actions { display: flex; gap: 12px; justify-content: center; }
+.game-btn { background: #6d4fc1; color: #fff; border-radius: 10px; padding: 10px 22px; font-weight: 700; transition: 0.2s; }
+.game-btn:hover { box-shadow: 0 0 16px rgba(130,95,220,0.5); }
+.game-btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--text-secondary); }
+.game-end-bad h2 { color: #cf2a2a; text-shadow: 0 0 20px rgba(207,42,42,0.5); }
+.game-end-secret h2 { color: #9f7fe0; text-shadow: 0 0 20px rgba(159,127,224,0.5); }
+
+/* ✉️ 信笺体排版（总局通讯） */
+.letter-card { margin-bottom: 18px; }
+.letter-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.letter-secret { font-size: 0.72rem; color: #cf2a2a; border: 1px solid rgba(207,42,42,0.4); border-radius: 4px; padding: 1px 8px; letter-spacing: 0.1em; }
+.letter-secret.top { background: rgba(207,42,42,0.15); font-weight: 700; }
+.letter-title { font-weight: 700; color: var(--text-primary); font-size: 0.95rem; }
+.letter-dept { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); }
+.letter-paper {
+    position: relative; font-family: "KaiTi", "楷体", "STKaiti", "SimSun", serif;
+    background:
+        radial-gradient(ellipse at 20% 10%, rgba(120,90,50,0.09), transparent 60%),
+        repeating-linear-gradient(0deg, rgba(120,100,60,0.05) 0, rgba(120,100,60,0.05) 1px, transparent 1px, transparent 28px),
+        #efe6d0;
+    color: #3d3326; border: 1px solid #c9b58a; border-radius: 8px; padding: 20px 22px 16px;
+    box-shadow: inset 0 0 30px rgba(120,90,40,0.12);
+}
+.letter-salute { font-size: 0.9rem; margin-bottom: 12px; color: #4a3d2c; }
+.letter-body { font-size: 0.92rem; line-height: 1.9; color: #3d3326; text-align: justify; margin-bottom: 18px; }
+.letter-footer { display: flex; align-items: flex-end; justify-content: space-between; }
+.letter-sign { font-size: 0.85rem; text-align: right; color: #4a3d2c; line-height: 1.7; }
+.letter-date { color: #7a6a50; font-size: 0.78rem; }
+.letter-seal {
+    color: #b03030; font-size: 0.78rem; letter-spacing: 0.12em; font-weight: 700;
+    border: 2px solid rgba(176,48,48,0.55); border-radius: 50%; width: 58px; height: 58px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    transform: rotate(-12deg); opacity: 0.85; line-height: 1.2; flex-shrink: 0;
+}
+.letter-comment { font-size: 0.8rem; color: var(--accent-red); border-left: 3px solid var(--accent-red); padding-left: 10px; margin-top: 8px; font-style: italic; }
+
+/* 🗂️ 档案体：收容物实验记录折叠 */
+.containment-exp { margin-top: 12px; border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 10px; }
+.containment-exp-head { font-size: 0.78rem; letter-spacing: 0.12em; color: #9f7fe0; margin-bottom: 8px; }
+.containment-exp-list { display: flex; flex-direction: column; gap: 6px; }
+.containment-exp-details { background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; }
+.containment-exp-details summary { cursor: pointer; color: var(--text-primary); font-size: 0.8rem; }
+.containment-exp-details[open] summary { color: var(--accent-red); margin-bottom: 8px; }
+.containment-exp-details p { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; margin: 4px 0; }
+
+/* 📚 故事合集 */
+.collection-list { display: flex; flex-direction: column; gap: 14px; }
+.collection-card { background: rgba(14,15,18,0.82); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; }
+.collection-head { display: flex; gap: 14px; margin-bottom: 10px; }
+.collection-ico { font-size: 1.8rem; }
+.collection-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+.collection-desc { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; margin-top: 4px; }
+.collection-progress { height: 6px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden; }
+.collection-bar { height: 100%; background: linear-gradient(90deg, var(--accent-red), #ff7a7a); border-radius: 999px; transition: width 0.4s; }
+.collection-meta { font-size: 0.72rem; color: var(--text-muted); margin: 6px 0 10px; }
+.collection-meta b { color: var(--accent-red); }
+.collection-items { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.collection-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; font-size: 0.84rem; color: var(--text-secondary); transition: 0.15s; }
+.collection-item:hover { background: rgba(207,42,42,0.08); border-color: rgba(207,42,42,0.3); color: var(--text-primary); }
+.collection-item.read { color: var(--text-muted); }
+.collection-item.read .ci-state { color: #6bf37f; }
+.ci-state { width: 18px; color: var(--text-muted); }
+.ci-title { flex: 1; min-width: 0; }
+.ci-tag { font-size: 0.6rem; color: var(--text-muted); border: 1px solid var(--border-color); padding: 0 8px; border-radius: 999px; flex-shrink: 0; }
+
+/* 🛒 积分商城 */
+.shop-cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.shop-cat-tab { font-size: 0.78rem; color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 999px; padding: 4px 14px; transition: 0.2s; }
+.shop-cat-tab.active { color: var(--accent-red); border-color: var(--accent-red); background: rgba(207,42,42,0.1); }
+.shop-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.shop-item { display: flex; align-items: center; gap: 12px; background: rgba(14,15,18,0.82); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; }
+.shop-ico { font-size: 1.5rem; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(207,42,42,0.1); border-radius: 10px; flex-shrink: 0; }
+.shop-main { flex: 1; min-width: 0; }
+.shop-name { font-weight: 700; color: var(--text-primary); font-size: 0.88rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.shop-cat { font-size: 0.62rem; color: var(--text-muted); border: 1px solid var(--border-color); padding: 1px 8px; border-radius: 999px; font-weight: 400; }
+.shop-desc { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }
+.shop-btn { font-size: 0.75rem; color: #ffd97a; border: 1px solid rgba(255,217,122,0.4); border-radius: 999px; padding: 5px 14px; transition: 0.2s; flex-shrink: 0; background: rgba(255,217,122,0.05); }
+.shop-btn:hover:not(:disabled) { background: rgba(255,217,122,0.15); }
+.shop-btn.owned { color: #6bf37f; border-color: rgba(107,243,127,0.4); }
+.shop-btn.cant { color: var(--text-muted); border-color: var(--border-color); }
+
+/* 导航略微收紧，容纳新增按钮 */
+.main-nav { gap: 3px; }
+.nav-btn { padding: 5px 12px; font-size: 0.78rem; }
+
+/* 🎴 民俗考据旁入口按钮（文游 / 合集 / 巷口杂货，独立类避免误触板块筛选） */
+.folk-entry {
+    background: transparent; padding: 6px 16px; color: var(--accent-red); font-size: 0.85rem;
+    transition: 0.2s; border-radius: 999px; border: 1px solid rgba(207,42,42,0.35); white-space: nowrap;
+}
+.folk-entry:hover { border-color: var(--accent-red); background: rgba(207,42,42,0.08); color: var(--accent-red); }
+.folk-entry .tab-ico { margin-right: 6px; font-size: 0.95rem; line-height: 1; filter: drop-shadow(0 0 5px rgba(207,42,42,0.35)); }
+
+/* 🪟 民俗专区 · 论坛内嵌面板（文游 / 合集 / 巷口杂货，融合进论坛主体） */
+.forum-view { display: none; animation: forumViewIn 0.3s ease; }
+@keyframes forumViewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.forum-view-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.forum-view-head .back-btn { flex-shrink: 0; }
+.forum-view-title { font-weight: 700; color: var(--text-primary); font-size: 1rem; letter-spacing: 0.06em; }
+.forum-view-title small { color: var(--text-muted); font-weight: 400; font-size: 0.7rem; margin-left: 8px; letter-spacing: 0.08em; }
+.game-ui-embed {
+    background: linear-gradient(170deg, #121018, #0a0a10);
+    border: 1px solid rgba(130,95,220,0.25); border-radius: 16px; overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(90,60,140,0.15);
+}
+.game-ui-embed .game-topbar { border-bottom: 1px solid rgba(130,95,220,0.2); }
+.game-ui-embed .game-body { min-height: 240px; }
+#forumCollectionSection .collection-list { display: flex; flex-direction: column; gap: 14px; }
+#forumShopSection .folk-shop-tabs { padding: 0 0 12px; }
+#forumShopSection .folk-shop-list { padding: 0; }
+
+/* 🪟 民俗专区弹层（论坛商城 / 故事合集） */
+.folk-overlay {
+    position: fixed; inset: 0; z-index: 9995; display: flex; align-items: center; justify-content: center;
+    background: rgba(5,6,10,0.82); backdrop-filter: blur(6px); padding: 16px;
+}
+.folk-ui {
+    width: min(680px, 94vw); max-height: 88vh; display: flex; flex-direction: column;
+    background: linear-gradient(170deg, #131519, #0a0b0f); border: 1px solid rgba(207,42,42,0.25);
+    border-radius: 16px; overflow: hidden; box-shadow: 0 0 40px rgba(0,0,0,0.85), 0 0 24px rgba(207,42,42,0.12);
+}
+.folk-topbar { display: flex; align-items: center; gap: 10px; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(20,12,14,0.5); }
+.folk-title { flex: 1; font-weight: 700; color: var(--text-primary); font-size: 0.95rem; letter-spacing: 0.06em; }
+.folk-title small { color: var(--text-muted); font-weight: 400; font-size: 0.7rem; margin-left: 8px; letter-spacing: 0.08em; }
+.folk-points { font-size: 0.78rem; color: var(--text-secondary); }
+.folk-points b { color: #ffd97a; }
+.folk-close { color: var(--text-muted); font-size: 1rem; padding: 2px 8px; border-radius: 6px; }
+.folk-close:hover { color: var(--accent-red); }
+.folk-shop-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 18px 0; }
+.folk-shop-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; padding: 16px 18px 20px; overflow-y: auto; }
+#folkCollectionList { padding: 16px 18px 20px; overflow-y: auto; }
+
+/* 🔨 终端商城 · 挂卖表单 */
+.terminal-shop-form { background: rgba(207,42,42,0.05); border: 1px dashed rgba(207,42,42,0.35); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.listing-form-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.listing-form-head span { font-weight: 700; color: var(--text-primary); font-size: 0.9rem; }
+.listing-form-head small { color: var(--text-muted); font-size: 0.72rem; }
+.listing-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.terminal-shop-form input { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; color: var(--text-primary); font-size: 0.8rem; }
+.terminal-shop-form input:focus { border-color: var(--accent-red); outline: none; }
+.listing-form-actions { margin-top: 10px; }
+
+/* 📦 上架商品标记 */
+.shop-qty { font-size: 0.68rem; color: var(--text-muted); }
+.shop-seller { font-size: 0.68rem; color: #9f7fe0; border: 1px solid rgba(130,95,220,0.35); padding: 0 7px; border-radius: 999px; }
+.shop-btn.mine { color: #ff7a7a; border-color: rgba(255,122,122,0.4); }
+.shop-btn.mine:hover { background: rgba(255,122,122,0.15); }
+.shop-item.mine-item { border-color: rgba(159,127,224,0.35); }
+.shop-empty { color: var(--text-muted); font-size: 0.82rem; padding: 22px 0; text-align: center; grid-column: 1 / -1; }
+
+/* 📜 文游生存守则 */
+.game-rules-btn { font-size: 0.72rem; color: #d8c9f0; border: 1px solid rgba(130,95,220,0.35); border-radius: 999px; padding: 3px 12px; background: rgba(130,95,220,0.12); transition: 0.2s; }
+.game-rules-btn:hover { background: rgba(130,95,220,0.25); color: #fff; }
+.game-rules-panel {
+    padding: 12px 16px; border-bottom: 1px solid rgba(130,95,220,0.2); background: rgba(10,8,16,0.85);
+    max-height: 34vh; overflow-y: auto;
+}
+.game-rules-head { font-size: 0.8rem; color: #9f7fe0; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 8px; }
+.rule-line { font-size: 0.78rem; color: #c8c0d8; line-height: 1.9; border-left: 2px solid rgba(159,127,224,0.4); padding-left: 10px; margin-bottom: 4px; font-family: "KaiTi","楷体",STKaiti,serif; }
