@@ -51,7 +51,7 @@ function purgeLegacySiteStorage() {
     const archiveSaved = safeGetJSON('xuju_archive', []);
     const postsSaved = safeGetJSON('darkalley_posts', []);
     const archiveVersion = localStorage.getItem('xuju_archive_version');
-    const validCategories = new Set(['墟界管理档案', '叛逃人员档案', '人物档案', '事件分支', '收容物分支']);
+    const validCategories = new Set(['华墟管理档案', '华墟地理', '威胁评估档案', '人物档案', '事件分支', '收容物分支']);
     const legacyTextPattern = /档案条例|总则条例|目录分支|正文内容|\.docx|整篇长文|利用文档|整理自|旧版档案/i;
     const archiveLooksLegacy = Array.isArray(archiveSaved) && (
         archiveSaved.length < 10 ||
@@ -59,7 +59,7 @@ function purgeLegacySiteStorage() {
             const text = `${item?.title || ''} ${item?.summary || ''} ${item?.content || ''}`;
             const category = String(item?.category || '');
             const isOldLabel = legacyTextPattern.test(`${category} ${text}`);
-            const isUnknownCategory = !!category && !validCategories.has(category) && !/^(人物档案|叛逃人员档案|墟界管理档案|事件分支|收容物分支)$/.test(category);
+            const isUnknownCategory = !!category && !validCategories.has(category) && !/^(人物档案|威胁评估档案|华墟管理档案|华墟地理|事件分支|收容物分支)$/.test(category);
             return isOldLabel || isUnknownCategory;
         }) ||
         archiveVersion !== ARCHIVE_DATA_VERSION
@@ -181,6 +181,10 @@ function startStars() {
         opacity: 0.25 + Math.random()*0.35
     }));
     let t = 0;
+    let meteor = null, meteorTick = 0;
+    function spawnMeteor() {
+        meteor = { x: Math.random() * canvas.width * 0.5 + 20, y: Math.random() * canvas.height * 0.3 + 10, vx: 5 + Math.random() * 5, vy: 2 + Math.random() * 2.5, life: 50 };
+    }
     function draw() {
         ctx.clearRect(0,0,canvas.width,canvas.height);
         stars.forEach(s => {
@@ -191,6 +195,14 @@ function startStars() {
             ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
             ctx.fill();
         });
+        // 流星（偶尔划过）
+        if (!meteor) { if (++meteorTick > 700 + Math.random() * 700) { spawnMeteor(); meteorTick = 0; } }
+        if (meteor) {
+            ctx.beginPath(); ctx.moveTo(meteor.x, meteor.y); ctx.lineTo(meteor.x - meteor.vx * 10, meteor.y - meteor.vy * 10);
+            ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.3; ctx.stroke();
+            meteor.x += meteor.vx; meteor.y += meteor.vy; meteor.life--;
+            if (meteor.life <= 0 || meteor.x > canvas.width + 40 || meteor.y > canvas.height + 40) meteor = null;
+        }
         t += 0.05;
         starAnimId = requestAnimationFrame(draw);
     }
@@ -233,6 +245,7 @@ function setupForumMiniPlayer() {
     if (prevBtn) prevBtn.addEventListener('click', () => setTrack(forumTrackIdx - 1));
     if (nextBtn) nextBtn.addEventListener('click', () => setTrack(forumTrackIdx + 1));
     bindNcmPlayer('forum');
+    setupPlayerMinimizeAndDrag();
 }
 
 let terminalTrackIdx = 0;
@@ -270,6 +283,82 @@ function setupMiniTerminalPlayer() {
     if (prevBtn) prevBtn.addEventListener('click', () => setTrack(terminalTrackIdx - 1));
     if (nextBtn) nextBtn.addEventListener('click', () => setTrack(terminalTrackIdx + 1));
     bindNcmPlayer('mini', 'terminal');
+    setupPlayerMinimizeAndDrag();
+}
+
+// ============ 🎛 播放器：收起 / 展开 / 拖拽移动 ============
+// 手机端、桌面通用：点「—」收起成小圆片（再点圆片展开），按住播放器可拖到任意位置（记忆位置）
+function setupPlayerMinimizeAndDrag() {
+    if (window.__playerUIInited) return;
+    window.__playerUIInited = true;
+    const cfg = [
+        { el: document.getElementById('forumVinylPlayer'), minBtn: document.getElementById('forumPlayerMin'), key: 'darkalley_player_pos_forum', z: 9999, id: 'forum' },
+        { el: document.getElementById('vinylPlayer'), minBtn: document.getElementById('miniPlayerMin'), key: 'darkalley_player_pos_terminal', z: 120, id: 'terminal' }
+    ];
+    let minState = {};
+    try { minState = JSON.parse(localStorage.getItem('darkalley_player_min') || '{}') || {}; } catch (e) { minState = {}; }
+    const saveMin = () => {
+        try {
+            localStorage.setItem('darkalley_player_min', JSON.stringify({
+                forum: cfg[0].el.classList.contains('minimized'),
+                terminal: cfg[1].el.classList.contains('minimized')
+            }));
+        } catch (e) {}
+    };
+    cfg.forEach((c) => {
+        const { el, minBtn, key, z, id } = c;
+        if (!el || !minBtn) return;
+        // 恢复收起状态与拖拽位置
+        if (minState[id]) el.classList.add('minimized');
+        try {
+            const p = JSON.parse(localStorage.getItem(key) || 'null');
+            if (p && typeof p.left === 'number' && typeof p.top === 'number') {
+                el.style.left = p.left + 'px';
+                el.style.top = p.top + 'px';
+                el.style.right = 'auto';
+                el.style.transform = 'none';
+            }
+        } catch (e) {}
+        // 收起 / 展开
+        minBtn.addEventListener('click', (e) => { e.stopPropagation(); el.classList.toggle('minimized'); saveMin(); });
+        el.addEventListener('click', (e) => {
+            if (el.classList.contains('minimized')) { el.classList.remove('minimized'); saveMin(); }
+        });
+        // 拖拽
+        let dragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
+        el.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('button, .ncm-pop, a, select, input, iframe')) return;
+            if (el.classList.contains('minimized')) return;
+            dragging = true;
+            const r = el.getBoundingClientRect();
+            startX = e.clientX; startY = e.clientY;
+            origLeft = r.left; origTop = r.top;
+            el.style.left = r.left + 'px'; el.style.top = r.top + 'px';
+            el.style.right = 'auto'; el.style.transform = 'none'; el.style.transition = 'none';
+            el.style.zIndex = '10000'; el.classList.add('dragging');
+            if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
+            e.preventDefault();
+        });
+        const onMove = (e) => {
+            if (!dragging) return;
+            let nx = origLeft + (e.clientX - startX);
+            let ny = origTop + (e.clientY - startY);
+            const r = el.getBoundingClientRect();
+            nx = Math.max(4, Math.min(window.innerWidth - r.width - 4, nx));
+            ny = Math.max(4, Math.min(window.innerHeight - r.height - 4, ny));
+            el.style.left = nx + 'px'; el.style.top = ny + 'px';
+        };
+        const onUp = () => {
+            if (!dragging) return;
+            dragging = false;
+            el.style.transition = ''; el.classList.remove('dragging'); el.style.zIndex = z;
+            const r = el.getBoundingClientRect();
+            try { localStorage.setItem(key, JSON.stringify({ left: r.left, top: r.top })); } catch (err) {}
+        };
+        el.addEventListener('pointermove', onMove);
+        el.addEventListener('pointerup', onUp);
+        el.addEventListener('pointercancel', onUp);
+    });
 }
 
 // ============ ☁ 网易云外链播放器 ============
@@ -369,11 +458,17 @@ function renderFeaturedPosts() {
     });
 }
 
+let forumSearchKw = '';
 function renderPostList() {
     const list = document.getElementById('postList');
     if (!list) return;
     let filtered = forumPosts;
-    if (currentBoard !== 'all') filtered = filtered.filter(p => p.board === currentBoard);
+    if (forumSearchKw) {
+        const kw = forumSearchKw.toLowerCase();
+        filtered = filtered.filter(p => (p.title + ' ' + p.content + ' ' + (p.author || '') + ' ' + (p.board || '')).toLowerCase().includes(kw));
+    } else if (currentBoard !== 'all') {
+        filtered = filtered.filter(p => p.board === currentBoard);
+    }
     const total = (filtered || []).length;
     const totalPages = Math.max(1, Math.ceil(total / POST_PAGE_SIZE));
     if (currentPostPage > totalPages) currentPostPage = totalPages;
@@ -655,6 +750,12 @@ document.querySelectorAll('.board-tab').forEach(tab => {
         renderPostList();
     });
 });
+const forumSearchInput = document.getElementById('forumSearchInput');
+if (forumSearchInput) forumSearchInput.addEventListener('input', () => {
+    forumSearchKw = forumSearchInput.value.trim();
+    currentPostPage = 1;
+    renderPostList();
+});
 document.getElementById('submitNewPostBtn').addEventListener('click', () => {
     const title = document.getElementById('newPostTitle').value.trim();
     const content = document.getElementById('newPostContent').value.trim();
@@ -812,13 +913,44 @@ function showTerminalLoading(callback) {
     }, 150);
 }
 
+// ============ 🛰 扫描数据角标时钟（主页地图卡 / 监测面板） ============
+function startScanMeta() {
+    const els = [document.getElementById('homeMapMeta'), document.getElementById('signalMapMeta')].filter(Boolean);
+    if (!els.length) return;
+    const fmt = (n) => String(n).padStart(2, '0');
+    const tick = () => {
+        const d = new Date();
+        const t = fmt(d.getHours()) + ':' + fmt(d.getMinutes()) + ':' + fmt(d.getSeconds());
+        const txt = 'LINK · ' + t + ' · STABLE';
+        els.forEach(el => { el.textContent = txt; });
+    };
+    tick();
+    if (window.__scanMetaTimer) clearInterval(window.__scanMetaTimer);
+    window.__scanMetaTimer = setInterval(tick, 1000);
+}
+// ============ 🕒 论坛页脚实时时钟 ============
+function startForumClock() {
+    const el = document.getElementById('forumClock');
+    if (!el) return;
+    const fmt = (n) => String(n).padStart(2, '0');
+    const tick = () => {
+        const d = new Date();
+        el.textContent = '· ' + fmt(d.getHours()) + ':' + fmt(d.getMinutes()) + ':' + fmt(d.getSeconds());
+    };
+    tick();
+    if (window.__forumClockTimer) clearInterval(window.__forumClockTimer);
+    window.__forumClockTimer = setInterval(tick, 1000);
+}
+
 // ============ 终端面板逻辑 ============
 function initTerminal() {
     if (terminalInited) return;
     terminalInited = true; loadArchive(); saveLocalDataBundle(); bindTerminalNav(); startRain();
     startTypewriter(); renderLingshi(); renderInternalPosts(); renderMissions();
+    applyTerminalTheme(safeGetJSON('darkalley_theme', 'default'));
     setupEditorEvents(); switchPanel('home'); renderHomeEmbed('bureau'); updateProfilePanel();
     document.getElementById('terminalFortuneText').textContent = getDailyFortune();
+    startScanMeta();
 }
 window.switchPanel = function(name) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -835,7 +967,7 @@ window.switchPanel = function(name) {
         if (activeCategory === '行动记录') { showArchiveActions(); } else { renderArchiveList(); }
     }
     if (name === 'admin') renderAdminList();
-    if (name === 'profile') updateProfilePanel();
+    if (name === 'profile') { updateProfilePanel(); renderThemeOptions(); }
     if (name === 'lingshi') renderLingshi();
     if (name === 'internalForum') renderInternalPosts();
     if (name === 'missions') renderMissions();
@@ -849,6 +981,17 @@ window.switchPanel = function(name) {
     if (name === 'shop') renderShop();
 }
 function bindTerminalNav() {
+    // 手机端导航收缩展开
+    const navEl = document.querySelector('.main-nav');
+    const collapseBtn = document.getElementById('navCollapseBtn');
+    if (navEl && collapseBtn) {
+        collapseBtn.addEventListener('click', () => {
+            navEl.classList.toggle('nav-open');
+            collapseBtn.classList.toggle('open');
+            const label = collapseBtn.querySelector('.nav-collapse-label');
+            if (label) label.textContent = navEl.classList.contains('nav-open') ? '收起' : '菜单';
+        });
+    }
     document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => btn.addEventListener('click', () => switchPanel(btn.dataset.panel)));
     document.querySelectorAll('.index-card').forEach(card => card.addEventListener('click', () => {
         if (card.dataset.panel) { renderHomeEmbed(card.dataset.panel); return; }
@@ -868,25 +1011,25 @@ function bindTerminalNav() {
 // ============ 档案检索、收容物、通讯等 ============
 function loadArchive() {
     const saved = safeGetJSON('xuju_archive', null);
-    const validCategories = new Set(['墟界管理档案', '叛逃人员档案', '人物档案', '事件分支', '收容物分支']);
+    const validCategories = new Set(['华墟管理档案', '华墟地理', '威胁评估档案', '人物档案', '事件分支', '收容物分支']);
     const normalizeArchiveItem = item => {
         if (!item || typeof item !== 'object') return null;
         const category = String(item.category || '');
-        const keyCategory = category === '档案条例' || category === '墟界管理档案' ? '墟界管理档案'
+        const keyCategory = category === '档案条例' || category === '华墟管理档案' ? '华墟管理档案'
             : category === '人物' || category === '人物档案' ? '人物档案'
-            : category === '叛逃人员' || category === '叛逃人员档案' ? '叛逃人员档案'
+            : category === '高危势力' || category === '威胁评估档案' ? '威胁评估档案'
             : category === '事件' || category === '事件分支' ? '事件分支'
             : category === '收容物' || category === '收容物分支' ? '收容物分支'
             : category;
         const normalized = { ...item, category: keyCategory };
         if (normalized.title && /^档案条例\s*·|^总则分支\s*·|^机制分支\s*·/.test(normalized.title)) {
-            normalized.title = normalized.title.replace(/^档案条例\s*·/, '墟界管理档案 ·').replace(/^总则分支\s*·/, '墟界管理档案 · 总则分支 ·').replace(/^机制分支\s*·/, '墟界管理档案 · 机制分支 ·');
+            normalized.title = normalized.title.replace(/^档案条例\s*·/, '华墟管理档案 ·').replace(/^总则分支\s*·/, '华墟管理档案 · 总则分支 ·').replace(/^机制分支\s*·/, '华墟管理档案 · 机制分支 ·');
         }
         if (normalized.title && /^人物档案\s*·/.test(normalized.title) && normalized.category === '人物档案') {
             normalized.title = normalized.title.replace(/^人物档案\s*·/, '人物档案 ·');
         }
         if (normalized.title && /^(人物档案|档案条例|事件分支|收容物分支)/.test(normalized.title) && !validCategories.has(normalized.category)) {
-            normalized.category = validCategories.has(normalized.category) ? normalized.category : '墟界管理档案';
+            normalized.category = validCategories.has(normalized.category) ? normalized.category : '华墟管理档案';
         }
         return normalized;
     };
@@ -1013,7 +1156,7 @@ function renderArchiveList() {
     grid.innerHTML = '';
 
     const categories = Array.from(new Set((archiveData || []).map(item => item.category).filter(Boolean))).sort((a, b) => {
-        const order = ['墟界管理档案', '叛逃人员档案', '人物档案', '事件分支', '收容物分支'];
+        const order = ['华墟管理档案', '华墟地理', '威胁评估档案', '人物档案', '事件分支', '收容物分支'];
         return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b));
     });
 
@@ -1127,11 +1270,16 @@ function openArchiveDetail(item) {
 
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    // 终端实际滚动容器是 #terminalContainer（body 不滚动），必须同时锁定，否则滚轮会穿透到外部容器
+    const tc = document.getElementById('terminalContainer');
+    if (tc) tc.style.overflow = 'hidden';
     content.innerHTML = `${header}<div style="line-height:1.7;color:var(--text-secondary);">${item.content}</div>`;
 }
 function closeArchiveDetail() {
     document.getElementById('archiveDetailModal').style.display = 'none';
     document.body.style.overflow = '';
+    const tc = document.getElementById('terminalContainer');
+    if (tc) tc.style.overflow = '';
 }
 document.getElementById('closeArchiveDetailBtn').addEventListener('click', closeArchiveDetail);
 document.getElementById('archiveDetailModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeArchiveDetail(); });
@@ -1395,15 +1543,20 @@ function setupEditorEvents() {
 
 // ============ 异常信号监测网（离线 SVG 网络图，替代 Leaflet 在线地图） ============
 const SIGNAL_SITES = [
-    { id:'a', name:'临江', level:'赤', status:'空间坍缩', time:'2024-11-22', desc:'旧城区边缘持续侦测到维度裂隙回响，规则型空域处于生成前兆，建议外勤小队保持待命。' },
-    { id:'b', name:'沧溟', level:'青', status:'模因污染', time:'2025-03-15', desc:'沿海地段出现认知污染残留，与"沧溟-2018-S级风暴事件"能量波形高度吻合，需持续追踪。' },
-    { id:'c', name:'旧纸厂', level:'待处理', status:'能量溢出', time:'2026-01-20', desc:'废弃厂区信号异常波动，疑似收容物级能量驻留，尚未完成现场核验，勿单独接近。' },
-    { id:'d', name:'梧桐巷', level:'观测', status:'民俗社', time:'持续', desc:'临川民俗研究社团活动区域，锚点能量平稳，标记为长期观测点位。' }
+    { id:'a', name:'京兆府', level:'总局', status:'HQSCA 核心', time:'持续', desc:'华墟共和国首都，全域墟化现象管控总局总部驻地，全国监测中枢，六大司局常驻，能量基准恒定。' },
+    { id:'b', name:'临川府', level:'观测', status:'民俗社', time:'持续', desc:'云江府省会，临川民俗研究社团活动区域，锚点能量平稳，标记为长期观测点位。' },
+    { id:'c', name:'沧溟府', level:'辛', status:'模因污染', time:'2025-03-15', desc:'沿海港口城市，认知污染残留与"沧溟风暴"能量波形高度吻合，与沧溟-S级风暴事件同源，需持续追踪。' },
+    { id:'d', name:'宁州府', level:'观测', status:'学术重镇', time:'持续', desc:'华墟学术重镇，玄理科研院分院驻地，收容物研究核心区，多处试验场能量读数稳定。' },
+    { id:'e', name:'玄水府', level:'庚', status:'古墓遗址', time:'2024-08-11', desc:'玄水省省会，多处古墓遗址频发规则型墟域，外勤小队重点巡防区，夜间信号间歇波动。' },
+    { id:'f', name:'赤岭府', level:'辛', status:'民俗禁忌', time:'2026-01-05', desc:'赤岭省省会，西南山区民俗保留完整，山野墟域事件频发，局地锚点能量偏高。' },
+    { id:'g', name:'南荒岭', level:'绝危', status:'无人区警戒', time:'持续', desc:'西南无人区，己阶以上高危墟域多发区，禁止未授权进入，全局最高响应，探测阵列全天候运转。' },
+    { id:'h', name:'沙洲府', level:'待核', status:'荒漠异常', time:'2026-02-01', desc:'戈壁省首府，西北荒漠深处多次侦测到异常能量残留，初步判定为收容物级，待现场核验。' }
 ];
 function initMap() {
     const mapEl = document.getElementById('signalMap');
     if (!mapEl) return;
     const readout = document.getElementById('sigReadout');
+    const siteList = document.getElementById('monitorSiteList');
     const selectSite = (site) => {
         if (!site) return;
         if (readout) {
@@ -1415,6 +1568,10 @@ function initMap() {
         mapEl.querySelectorAll('.sig-node').forEach(n => n.classList.remove('active'));
         const node = mapEl.querySelector(`.sig-node[data-site="${site.name}"]`);
         if (node) node.classList.add('active');
+        if (siteList) {
+            siteList.querySelectorAll('.monitor-site-item').forEach(item =>
+                item.classList.toggle('active', item.dataset.site === site.name));
+        }
     };
     mapEl.querySelectorAll('.sig-node').forEach(node => {
         node.addEventListener('click', () => {
@@ -1422,6 +1579,21 @@ function initMap() {
             selectSite(site);
         });
     });
+    // 生成华墟各分区监测站点清单
+    if (siteList) {
+        siteList.innerHTML = SIGNAL_SITES.map(site => `
+            <button class="monitor-site-item" data-site="${site.name}">
+                <span class="ms-dot"></span>
+                <span class="ms-name">${site.name}</span>
+                <span class="ms-tag">${site.level}</span>
+            </button>`).join('');
+        siteList.querySelectorAll('.monitor-site-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const site = SIGNAL_SITES.find(s => s.name === item.dataset.site);
+                selectSite(site);
+            });
+        });
+    }
     // 默认高亮第一个节点，展示一条摘要
     if (SIGNAL_SITES.length) selectSite(SIGNAL_SITES[0]);
 }
@@ -1471,6 +1643,33 @@ function bindTypeKeyInputs() {
         const el = document.getElementById(id);
         if (el) el.addEventListener('keydown', playTypeKey);
     });
+}
+// 全局点击提示音（极轻）
+function playClick() {
+    try {
+        if (!typeCtx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; typeCtx = new AC(); }
+        if (typeCtx.state === 'suspended') typeCtx.resume();
+        const now = typeCtx.currentTime;
+        const osc = typeCtx.createOscillator();
+        const gain = typeCtx.createGain();
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(560 + Math.random() * 240, now);
+        gain.gain.setValueAtTime(0.028, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain); gain.connect(typeCtx.destination);
+        osc.start(now); osc.stop(now + 0.05);
+    } catch (e) {}
+}
+function bindClickSfx() {
+    document.addEventListener('click', (e) => {
+        const el = e.target && e.target.closest ? e.target.closest('button, a, .post-item, .collection-item, .archive-card-item, .nav-btn, .board-tab, .folk-entry, .index-card, .ncm-track, .game-option') : null;
+        if (el) playClick();
+    }, true);
+}
+// 时辰显示
+function shiChenLabel() {
+    const h = new Date().getHours();
+    const arr = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+    return '☾ ' + arr[Math.floor(((h + 1) % 24) / 2)] + '时';
 }
 
 // ============ 🏛️ 总局六大司局 ============
@@ -1895,6 +2094,29 @@ function delistItem(id) {
     renderShop();
     alert('已下架「' + li.name + '」');
 }
+// 🎨 终端主题皮肤
+function applyTerminalTheme(name) {
+    const term = document.getElementById('terminalContainer');
+    if (!term) return;
+    term.classList.remove('theme-night', 'theme-blood');
+    if (name && name !== 'default') term.classList.add('theme-' + name);
+    safeSet('darkalley_theme', name || 'default');
+    document.querySelectorAll('#themeOptions .theme-opt').forEach(o => o.classList.toggle('active', o.dataset.theme === (name || 'default')));
+}
+function renderThemeOptions() {
+    const wrap = document.getElementById('themeOptions');
+    if (!wrap) return;
+    const owned = getOwned();
+    const cur = safeGetJSON('darkalley_theme', 'default') || 'default';
+    const opts = [
+        { theme: 'default', label: '◐ 默认 · 猩红', locked: false },
+        { theme: 'night', label: '🌑 暗夜 · 玄青', locked: owned.indexOf('t10') === -1 },
+        { theme: 'blood', label: '🌕 血月 · 赤金', locked: owned.indexOf('t11') === -1 }
+    ];
+    wrap.innerHTML = opts.map(o => `<button class="theme-opt${o.locked ? ' locked' : ''}${cur === o.theme ? ' active' : ''}" data-theme="${o.theme}" ${o.locked ? 'title="需在终端商城兑换（暗夜皮肤）"' : ''} type="button">${o.label}${o.locked ? ' 🔒' : ''}</button>`).join('');
+    wrap.querySelectorAll('.theme-opt:not(.locked)').forEach(b => b.addEventListener('click', () => applyTerminalTheme(b.dataset.theme)));
+}
+
 function renderMyListings() {
     const wrap = document.getElementById('myListings');
     const hint = document.getElementById('myListingsHint');
@@ -1968,7 +2190,10 @@ function setForumView(showId) {
         const el = document.getElementById(k);
         if (el) el.style.display = (k === showId) ? (k === 'postListView' ? 'flex' : 'block') : 'none';
     });
-    document.body.style.overflow = (showId === 'postDetailView') ? 'hidden' : '';
+    // 帖子详情弹层：同时锁定 body 与 html（视口），避免滚到底时页脚「那扇门」透出重叠
+    const lockScroll = (showId === 'postDetailView') ? 'hidden' : '';
+    document.body.style.overflow = lockScroll;
+    document.documentElement.style.overflow = lockScroll;
 }
 function showForumView(id) {
     setForumView(id);
@@ -2011,6 +2236,7 @@ try {
     bindListingForm();
     bindPasswordToggle();
     bindTypeKeyInputs();
+    bindClickSfx();
     startStars();
     setupForumMiniPlayer();
     renderFeaturedPosts();
@@ -2026,4 +2252,7 @@ try {
         moreBtn.textContent = more.classList.contains('open') ? '△ 收起版块' : '☰ 更多版块';
     });
     updatePortalStatus();
+    const shiChenEl = document.getElementById('shiChen');
+    if (shiChenEl) { const updShi = () => shiChenEl.textContent = shiChenLabel(); updShi(); setInterval(updShi, 60000); }
+    startForumClock();
 } catch(e) { console.error('初始化失败:', e); }

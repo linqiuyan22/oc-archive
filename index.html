@@ -61,6 +61,7 @@
                 <button id="forumMiniPlayBtn" class="mini-play-btn">▶</button>
                 <button id="forumNextBtn" class="mini-nav-btn" title="下一首">›</button>
                 <button id="forumNcmBtn" class="ncm-toggle" title="网易云外链">☁</button>
+                <button id="forumPlayerMin" class="player-min-btn" type="button" title="收起播放器">—</button>
             </div>
             <div class="ncm-pop" id="forumNcmPop">
                 <div class="ncm-head"><span>☁ 鹰角 · 塞壬唱片</span><button id="forumNcmClose" class="ncm-close" type="button">✕</button></div>
@@ -84,6 +85,10 @@
             <div class="featured-posts-slider" id="featuredSlider"></div>
         </div>
 
+        <div class="forum-search">
+            <span class="search-ico">⌕</span>
+            <input id="forumSearchInput" type="text" placeholder="搜索帖子 / 关键词 / 作者..." autocomplete="off">
+        </div>
         <div class="board-tabs">
             <button class="board-tab active" data-board="all"><span class="tab-ico">◉</span>全部</button>
             <button class="board-tab" data-board="灵异见闻"><span class="tab-ico">👁️</span>灵异见闻</button>
@@ -229,7 +234,7 @@
             </main>
         </div>
         <footer class="forum-footer">
-            <p>暗巷 - 匿名灵异讨论区</p>
+            <p>暗巷 - 匿名灵异讨论区 <span class="shi-chen" id="shiChen"></span><span class="forum-clock" id="forumClock"></span></p>
             <p class="footer-awaken"><a href="#" id="awakenEntryFooter">[ 如果你知道那扇门 ]</a></p>
         </footer>
     </div>
@@ -284,6 +289,7 @@
             </header>
             <nav class="main-nav">
                 <span class="nav-notch" title="灵枢链接稳定"></span>
+                <button class="nav-collapse-btn" id="navCollapseBtn"><span class="nav-ico">☰</span><span class="nav-collapse-label">菜单</span></button>
                 <button class="nav-btn active" data-panel="home"><span class="nav-ico">⌂</span>主页</button>
                 <button class="nav-btn" data-panel="monitor"><span class="nav-ico">◎</span>监测</button>
                 <button class="nav-btn" data-panel="containment"><span class="nav-ico">▤</span>收容物</button>
@@ -300,15 +306,16 @@
                 <div class="panel" id="monitorPanel">
                     <div class="scp-header"><span>✦ 实时监测</span></div>
                     <div class="monitor-legend">
-                        <span>信号网络</span>
-                        <span>旧城区</span>
-                        <span>待处理</span>
+                        <span>总局核心</span>
+                        <span>高危监测</span>
+                        <span>常规观测</span>
                     </div>
                     <div class="monitor-grid-overlay"></div>
                     <div class="monitor-radar"></div>
                     <div class="monitor-texture monitor-texture-blueprint"></div>
                     <div class="monitor-texture monitor-texture-flower"></div>
                     <div class="signal-map" id="signalMap">
+                        <img class="signal-map-bg" src="images/azgaar-map-nolabel.png" alt="华墟监测地图" loading="lazy">
                         <svg class="signal-svg" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid meet">
                             <defs>
                                 <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -321,36 +328,67 @@
                                     <stop offset="100%" stop-color="rgba(207,42,42,0)" />
                                 </radialGradient>
                             </defs>
-                            <line class="sig-line sig-line-a" x1="130" y1="120" x2="400" y2="210" />
-                            <line class="sig-line sig-line-b" x1="400" y1="210" x2="660" y2="130" />
-                            <line class="sig-line sig-line-c" x1="130" y1="120" x2="660" y2="130" />
-                            <circle class="sig-sweep" cx="400" cy="210" r="10" />
+                            <!-- 全域监测网络连线（京兆府总局为中枢） -->
+                            <line class="sig-line sig-line-a" x1="432" y1="215" x2="613" y2="196" />
+                            <line class="sig-line sig-line-b" x1="432" y1="215" x2="700" y2="196" />
+                            <line class="sig-line sig-line-c" x1="432" y1="215" x2="538" y2="215" />
+                            <line class="sig-line sig-line-d" x1="432" y1="215" x2="327" y2="243" />
+                            <line class="sig-line sig-line-e" x1="432" y1="215" x2="233" y2="321" />
+                            <line class="sig-line sig-line-f" x1="432" y1="215" x2="159" y2="363" />
+                            <line class="sig-line sig-line-g" x1="432" y1="215" x2="165" y2="113" />
+                            <circle class="sig-sweep" cx="432" cy="215" r="10" />
+                            <text x="400" y="38" fill="rgba(207,42,42,0.75)" font-size="11" text-anchor="middle" letter-spacing="3" style="font-family:inherit">全域监测网 · 总局 HQSCA</text>
                         </svg>
-                        <div class="sig-node sig-node-a" data-site="临江">
+                        <div class="sig-node" data-site="京兆府" style="left:54%;top:51%;">
                             <span class="sig-node-dot"></span>
-                            <span class="sig-node-name">临江</span>
-                            <span class="sig-node-tag">己阶·空间坍缩</span>
+                            <span class="sig-node-name">京兆府</span>
+                            <span class="sig-node-tag">总局 · HQ</span>
                         </div>
-                        <div class="sig-node sig-node-b" data-site="沧溟">
+                        <div class="sig-node" data-site="临川府" style="left:76.6%;top:46.8%;">
                             <span class="sig-node-dot"></span>
-                            <span class="sig-node-name">沧溟</span>
-                            <span class="sig-node-tag">辛阶·模因污染</span>
+                            <span class="sig-node-name">临川府</span>
+                            <span class="sig-node-tag">云江 · 观测</span>
                         </div>
-                        <div class="sig-node sig-node-c" data-site="旧纸厂">
+                        <div class="sig-node" data-site="沧溟府" style="left:87.5%;top:46.8%;">
                             <span class="sig-node-dot"></span>
-                            <span class="sig-node-name">旧纸厂</span>
-                            <span class="sig-node-tag">待处理·能量溢出</span>
+                            <span class="sig-node-name">沧溟府</span>
+                            <span class="sig-node-tag">沿海 · 模因</span>
                         </div>
-                        <div class="sig-node sig-node-d" data-site="梧桐巷">
+                        <div class="sig-node" data-site="宁州府" style="left:67.3%;top:51%;">
                             <span class="sig-node-dot"></span>
-                            <span class="sig-node-name">梧桐巷</span>
-                            <span class="sig-node-tag">观测·民俗社</span>
+                            <span class="sig-node-name">宁州府</span>
+                            <span class="sig-node-tag">学术 · 观测</span>
+                        </div>
+                        <div class="sig-node" data-site="玄水府" style="left:40.8%;top:57.8%;">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">玄水府</span>
+                            <span class="sig-node-tag">古墓 · 庚阶</span>
+                        </div>
+                        <div class="sig-node" data-site="赤岭府" style="left:29.2%;top:76.5%;">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">赤岭府</span>
+                            <span class="sig-node-tag">山野 · 辛阶</span>
+                        </div>
+                        <div class="sig-node" data-site="南荒岭" style="left:19.8%;top:86.4%;">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">南荒岭</span>
+                            <span class="sig-node-tag">绝危 · 禁入</span>
+                        </div>
+                        <div class="sig-node" data-site="沙洲府" style="left:20.6%;top:27%;">
+                            <span class="sig-node-dot"></span>
+                            <span class="sig-node-name">沙洲府</span>
+                            <span class="sig-node-tag">荒漠 · 待核</span>
                         </div>
                         <div class="sig-readout" id="sigReadout">
                             <div class="sig-readout-head">🔗 信号通道 · 待选节点</div>
-                            <div class="sig-readout-body">悬停或点击上方节点，查看该点位异常信号摘要。</div>
+                            <div class="sig-readout-body">点击地图节点或下方站点，查看该点位异常信号摘要。</div>
                         </div>
+                        <div class="scan-line"></div>
+                        <div class="scan-radar"></div>
+                        <div class="scan-hud"><i></i><i></i><i></i><i></i></div>
+                        <div class="scan-meta" id="signalMapMeta"></div>
                     </div>
+                    <div class="monitor-site-list" id="monitorSiteList"></div>
                 </div>
                 <div class="panel" id="containmentPanel">
                     <div class="scp-header">
@@ -394,7 +432,55 @@
                             </div>
                         </div>
                         <div class="home-map-card">
-                            <img src="images/hand-map.jpg" alt="区域地图">
+                            <svg class="hua-xu-map" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.9;">
+                                <defs>
+                                    <radialGradient id="hxGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(207,42,42,0.55)"/><stop offset="100%" stop-color="rgba(207,42,42,0)"/></radialGradient>
+                                    <linearGradient id="hxLand" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a1d24"/><stop offset="100%" stop-color="#0f1116"/></linearGradient>
+                                </defs>
+                                <path d="M130,70 L270,50 L400,38 L540,52 L650,80 L730,150 L745,245 L700,345 L625,420 L520,462 L415,472 L310,452 L215,418 L145,340 L100,235 L112,145 Z" fill="url(#hxLand)" stroke="#3a3f4b" stroke-width="2"/>
+                                <path d="M100,260 L745,260" stroke="rgba(255,255,255,0.045)" stroke-width="1"/>
+                                <path d="M120,130 L730,130" stroke="rgba(255,255,255,0.045)" stroke-width="1"/>
+                                <path d="M180,40 L180,470" stroke="rgba(255,255,255,0.045)" stroke-width="1"/>
+                                <path d="M320,40 L320,470" stroke="rgba(255,255,255,0.045)" stroke-width="1"/>
+                                <path d="M500,40 L500,470" stroke="rgba(255,255,255,0.045)" stroke-width="1"/>
+                                <path d="M640,40 L640,470" stroke="rgba(255,255,255,0.045)" stroke-width="1"/>
+                                <path d="M400,38 L400,472" stroke="rgba(207,42,42,0.3)" stroke-dasharray="7,6" stroke-width="1.5"/>
+                                <path d="M112,300 L700,300" stroke="rgba(207,42,42,0.22)" stroke-dasharray="7,6" stroke-width="1.5"/>
+                                <path d="M260,50 L260,320" stroke="rgba(207,42,42,0.18)" stroke-dasharray="5,6" stroke-width="1"/>
+                                <text x="140" y="105" fill="#8f96a2" font-size="11" letter-spacing="2">西北大区</text>
+                                <text x="425" y="118" fill="#8f96a2" font-size="11">京畿大区</text>
+                                <text x="596" y="108" fill="#8f96a2" font-size="11">东北大区</text>
+                                <text x="328" y="330" fill="#8f96a2" font-size="11">中部大区</text>
+                                <text x="516" y="330" fill="#8f96a2" font-size="11">东南沿海大区</text>
+                                <text x="225" y="392" fill="#8f96a2" font-size="11">西南大区</text>
+                                <circle cx="400" cy="150" r="6" fill="#cf2a2a" filter="url(#hxGlow)"/>
+                                <text x="415" y="145" fill="#f0ece4" font-size="12" font-weight="700">京兆府</text>
+                                <text x="415" y="160" fill="#cf2a2a" font-size="10">总局总部 · HQSCA</text>
+                                <circle cx="560" cy="330" r="4" fill="#cf2a2a"/>
+                                <text x="572" y="326" fill="#e8e6e1" font-size="11">临川府</text>
+                                <circle cx="655" cy="385" r="4" fill="#cf2a2a"/>
+                                <text x="667" y="381" fill="#e8e6e1" font-size="11">沧溟府</text>
+                                <circle cx="330" cy="290" r="3" fill="#cf8a8a"/>
+                                <text x="342" y="286" fill="#c9c6bf" font-size="10">宁州府</text>
+                                <circle cx="620" cy="120" r="3" fill="#6b7280"/>
+                                <text x="632" y="116" fill="#a8adb8" font-size="10">青阳府</text>
+                                <circle cx="250" cy="385" r="3" fill="#6b7280"/>
+                                <text x="262" y="381" fill="#a8adb8" font-size="10">赤岭府</text>
+                                <circle cx="610" cy="280" r="3" fill="#6b7280"/>
+                                <text x="622" y="276" fill="#a8adb8" font-size="10">白鹭府</text>
+                                <circle cx="460" cy="210" r="3" fill="#6b7280"/>
+                                <text x="472" y="206" fill="#a8adb8" font-size="10">玄水府</text>
+                                <circle cx="390" cy="350" r="3" fill="#6b7280"/>
+                                <text x="402" y="346" fill="#a8adb8" font-size="10">苍梧府</text>
+                                <circle cx="150" cy="105" r="3" fill="#6b7280"/>
+                                <text x="162" y="101" fill="#a8adb8" font-size="10">沙洲府</text>
+                                <circle cx="215" cy="165" r="3" fill="#6b7280"/>
+                                <text x="227" y="161" fill="#a8adb8" font-size="10">云中府</text>
+                                <circle cx="510" cy="452" r="3" fill="#6b7280"/>
+                                <text x="522" y="448" fill="#a8adb8" font-size="10">琼海府</text>
+                                <text x="195" y="430" fill="#8a4b4b" font-size="10">南荒岭</text>
+                                <text x="178" y="445" fill="#5a5f6b" font-size="9">· 无人区警戒 ·</text>
+                            </svg>
                             <div class="map-overlay"></div>
                             <div class="map-grid"></div>
                             <div class="map-scanline"></div>
@@ -404,7 +490,10 @@
                             <span class="map-marker" style="left:62%;top:55%;"></span>
                             <span class="map-marker" style="left:48%;top:70%;"></span>
                             <span class="map-marker" style="left:74%;top:30%;"></span>
-                            <div class="map-label">区域扫描</div>
+                            <div class="map-label">华墟扫描 · 总局 HQSCA</div>
+                            <div class="scan-radar"></div>
+                            <div class="scan-hud"><i></i><i></i><i></i><i></i></div>
+                            <div class="scan-meta" id="homeMapMeta"></div>
                             <div class="map-pulse"></div>
                         </div>
                     </div>
@@ -421,8 +510,9 @@
                 <div class="panel" id="archivePanel">
                     <div class="archive-nav-tabs">
                         <button class="cat-tab active" data-category="all">全部</button>
-                        <button class="cat-tab" data-category="墟界管理档案">墟界管理档案</button>
-                        <button class="cat-tab" data-category="叛逃人员档案">叛逃人员档案</button>
+                        <button class="cat-tab" data-category="华墟管理档案">华墟管理档案</button>
+                        <button class="cat-tab" data-category="华墟地理">华墟地理</button>
+                        <button class="cat-tab" data-category="威胁评估档案">威胁评估档案</button>
                         <button class="cat-tab" data-category="人物档案">人物档案</button>
                         <button class="cat-tab" data-category="收容物分支">收容物分支</button>
                         <button class="cat-tab" data-category="事件分支">事件分支</button>
@@ -460,6 +550,7 @@
                         <div class="profile-summary-item"><small>收藏数</small><strong id="statFav">0</strong></div>
                         <div class="profile-summary-item"><small>历史记录</small><strong id="statHistory">0</strong></div>
                     </div>
+                    <div class="profile-section"><h3>🎨 终端皮肤</h3><div class="theme-options" id="themeOptions"></div></div>
                     <div class="profile-section"><h3>📌 收藏</h3><div id="favList"></div></div>
                     <div class="profile-section"><h3>🕓 最近</h3><div id="historyList"></div></div>
                 </div>
@@ -544,7 +635,7 @@
                 <div class="modal-box">
                     <h3 id="modalTitle">编辑档案</h3>
                     <label>编号</label><input type="text" id="editId"><label>标题</label><input type="text" id="editTitle">
-                    <label>分类</label><select id="editCategory"><option>墟界管理档案</option><option>叛逃人员档案</option><option>人物档案</option><option>事件分支</option><option>收容物分支</option></select>
+                    <label>分类</label><select id="editCategory"><option>墟界管理档案</option><option>威胁评估档案</option><option>人物档案</option><option>事件分支</option><option>收容物分支</option></select>
                     <label>标签</label><input type="text" id="editTags"><label>摘要</label><textarea id="editSummary" rows="2"></textarea>
                     <label>详细内容</label><div class="editor-toolbar"><button id="insertImageBtn">🔗 插图</button></div>
                     <div class="dropzone" id="imageDropZone">🖼️ 拖拽图片到此处</div>
@@ -575,6 +666,7 @@
                 <button id="miniPlayBtn" class="mini-play-btn">▶</button>
                 <button id="miniNextBtn" class="mini-nav-btn" title="下一首">›</button>
                 <button id="miniNcmBtn" class="ncm-toggle" title="网易云外链">☁</button>
+                <button id="miniPlayerMin" class="player-min-btn" type="button" title="收起播放器">—</button>
             </div>
             <div class="ncm-pop" id="miniNcmPop">
                 <div class="ncm-head"><span>☁ 鹰角 · 塞壬唱片</span><button id="miniNcmClose" class="ncm-close" type="button">✕</button></div>
