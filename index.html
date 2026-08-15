@@ -61,6 +61,10 @@
                 <button id="forumMiniPlayBtn" class="mini-play-btn">▶</button>
                 <button id="forumNextBtn" class="mini-nav-btn" title="下一首">›</button>
                 <button id="forumNcmBtn" class="ncm-toggle" title="网易云外链">☁</button>
+                <div class="vol-wrap">
+                    <button id="forumVolToggle" class="vol-toggle" type="button" title="音量">🔊</button>
+                    <input type="range" id="forumVolSlider" class="vol-slider" min="0" max="100" value="30" title="音量">
+                </div>
                 <button id="forumPlayerMin" class="player-min-btn" type="button" title="收起播放器">—</button>
             </div>
             <div class="ncm-pop" id="forumNcmPop">
@@ -551,7 +555,11 @@
                         <div class="profile-summary-item"><small>历史记录</small><strong id="statHistory">0</strong></div>
                     </div>
                     <div class="profile-section"><h3>🎨 终端皮肤</h3><div class="theme-options" id="themeOptions"></div></div>
-                    <div class="profile-section"><h3>📌 收藏</h3><div id="favList"></div></div>
+                    <div class="profile-section"><h3>📌 收藏</h3>
+                        <div class="fav-groups" id="favGroups"></div>
+                        <div class="fav-new-group"><input id="favNewGroupInput" placeholder="新分组名…" maxlength="10"><button id="favNewGroupBtn" class="admin-btn">建组</button></div>
+                        <div id="favList"></div>
+                    </div>
                     <div class="profile-section"><h3>🕓 最近</h3><div id="historyList"></div></div>
                 </div>
                 <div class="panel" id="bureauPanel">
@@ -666,6 +674,10 @@
                 <button id="miniPlayBtn" class="mini-play-btn">▶</button>
                 <button id="miniNextBtn" class="mini-nav-btn" title="下一首">›</button>
                 <button id="miniNcmBtn" class="ncm-toggle" title="网易云外链">☁</button>
+                <div class="vol-wrap">
+                    <button id="miniVolToggle" class="vol-toggle" type="button" title="音量">🔊</button>
+                    <input type="range" id="miniVolSlider" class="vol-slider" min="0" max="100" value="30" title="音量">
+                </div>
                 <button id="miniPlayerMin" class="player-min-btn" type="button" title="收起播放器">—</button>
             </div>
             <div class="ncm-pop" id="miniNcmPop">

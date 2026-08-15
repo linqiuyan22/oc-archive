@@ -9,12 +9,14 @@ const VALID_USERS = {
     'L-09-05-L': { pass:'kuanggu', name:'陆烬弦', isAdmin:false }
 };
 
-const ARCHIVE_DATA_VERSION = 'xuju-archive-v4-characters';
+const ARCHIVE_DATA_VERSION = 'xuju-archive-v6-history';
 
 window.currentUser = null;
 purgeLegacySiteStorage();
 let archiveData = [];
-let userFavorites = {};
+let userFavorites = safeGetJSON('xuju_favorites', {});
+// 迁移旧 bundle 里的 userFavorites（旧数组格式在 favGroups() 中自动转分组）
+try { const _b = JSON.parse(localStorage.getItem('site_local_data_bundle') || 'null'); if (_b && _b.userFavorites) { for (const k in _b.userFavorites) { if (!userFavorites[k]) userFavorites[k] = _b.userFavorites[k]; } } } catch (e) {}
 let userHistory = {};
 let userLoginCounts = {};
 let currentPanel = 'home';
@@ -68,7 +70,7 @@ function purgeLegacySiteStorage() {
         const text = `${post?.title || ''} ${post?.content || ''}`;
         return /正文内容|档案条例|总则条例|整篇长文|目录分支|旧版档案/i.test(text);
     });
-    if (archiveLooksLegacy || postsLooksLegacy) {
+    if (archiveLooksLegacy || postsLooksLegacy || archiveVersion !== ARCHIVE_DATA_VERSION) {
         legacyKeys.forEach(key => localStorage.removeItem(key));
         localStorage.setItem('xuju_archive_version', ARCHIVE_DATA_VERSION);
         console.log('已清理旧版缓存，恢复为分支式档案结构。');
@@ -229,12 +231,13 @@ function setupForumMiniPlayer() {
         const t = LOCAL_TRACKS[forumTrackIdx];
         sourceEl.src = t.file;
         if (disc) disc.src = t.cover || disc.src;
-        if (statusText) { statusText.textContent = t.title; statusText.title = t.title; }
+        if (statusText) { statusText.textContent = t.title; statusText.title = t.title + (t.artist ? ' · ' + t.artist : '') + (t.album ? ' · 《' + t.album + '》' : ''); }
         audio.load();
         if (!audio.paused) audio.play().catch(() => {});
     };
     setTrack(0);
     audio.volume = 0.3;
+    bindPlayerVolume(audio, document.getElementById('forumVolSlider'), document.getElementById('forumVolToggle'), 'darkalley_volume_forum');
     btn.addEventListener('click', () => {
         if (audio.paused) {
             audio.play().then(() => { playerContainer.classList.add('playing'); if (actionText) actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸'; }).catch(() => {});
@@ -267,12 +270,13 @@ function setupMiniTerminalPlayer() {
         const t = LOCAL_TRACKS[terminalTrackIdx];
         sourceEl.src = t.file;
         if (disc) disc.src = t.cover || disc.src;
-        if (statusText) { statusText.textContent = t.title; statusText.title = t.title; }
+        if (statusText) { statusText.textContent = t.title; statusText.title = t.title + (t.artist ? ' · ' + t.artist : '') + (t.album ? ' · 《' + t.album + '》' : ''); }
         audio.load();
         if (!audio.paused) audio.play().catch(() => {});
     };
     setTrack(0);
     audio.volume = 0.3;
+    bindPlayerVolume(audio, document.getElementById('miniVolSlider'), document.getElementById('miniVolToggle'), 'darkalley_volume_terminal');
     btn.addEventListener('click', () => {
         if (audio.paused) {
             audio.play().then(() => { playerContainer.classList.add('playing'); if (actionText) actionText.textContent = '[ 播放中 ]'; btn.textContent = '⏸'; }).catch(() => {});
@@ -473,8 +477,14 @@ function renderPostList() {
     const totalPages = Math.max(1, Math.ceil(total / POST_PAGE_SIZE));
     if (currentPostPage > totalPages) currentPostPage = totalPages;
     if (currentPostPage < 1) currentPostPage = 1;
-    const reversed = (filtered || []).slice().reverse();
-    const pageItems = reversed.slice((currentPostPage - 1) * POST_PAGE_SIZE, currentPostPage * POST_PAGE_SIZE);
+    // 置顶帖（标题含【置顶】）始终排在列表最前，不被新增帖子顶下去；其余按时间倒序（新增在前）
+    const sorted = (filtered || []).slice().sort((a, b) => {
+        const pa = /【置顶】|\[置顶\]/.test(a.title || '') ? 1 : 0;
+        const pb = /【置顶】|\[置顶\]/.test(b.title || '') ? 1 : 0;
+        if (pa !== pb) return pb - pa;
+        return String(b.timestamp || '').localeCompare(String(a.timestamp || ''));
+    });
+    const pageItems = sorted.slice((currentPostPage - 1) * POST_PAGE_SIZE, currentPostPage * POST_PAGE_SIZE);
     if (total === 0) {
         list.innerHTML = `<div class="post-item" style="text-align:center;color:var(--text-muted);pointer-events:none;border-color:transparent;">该板块还没有帖子，快来发布第一篇讨论吧。</div>`;
     } else {
@@ -665,10 +675,12 @@ window.showPostDetail = function(id) {
                 </div>
             </div>
             <h2>${post.title}</h2>
+            <div class="post-detail-actions">${favBtnHtml(post.id, post.title)}</div>
         </div>
         <div class="post-detail-body">
             ${bodyHtml}
         </div>`;
+    bindFavBtn(document.getElementById('postDetailContent'));
     const likeBtn = document.querySelector('.post-like-btn');
     if (likeBtn) likeBtn.addEventListener('click', () => {
         post.likes = (post.likes || 0) + 1;
@@ -713,7 +725,10 @@ function renderComments(post) {
     listEl.querySelectorAll('.quote-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const c = comments[+btn.dataset.idx]; if (!c) return;
-            window.pendingReply = { user: c.user, text: c.text.slice(0, 50) + (c.text.length > 50 ? '…' : ''), floor: (+btn.dataset.idx) + 2 };
+            let chain = c.text.slice(0, 50) + (c.text.length > 50 ? '…' : '');
+            // 楼中楼：若被引用的评论本身也是引用，把引用链一并带上，更真实
+            if (c.replyTo) chain = '↩ ' + c.replyTo.user + '：' + (String(c.replyTo.text || '').slice(0, 30) || '…') + ' ｜ ' + chain;
+            window.pendingReply = { user: c.user, text: chain, floor: (+btn.dataset.idx) + 2 };
             const hint = document.getElementById('commentReplyHint');
             if (hint) { hint.style.display = 'flex'; document.getElementById('replyHintText').textContent = `@${c.user}（${(+btn.dataset.idx)+2}楼）`; }
             const input = document.getElementById('commentInput');
@@ -913,7 +928,50 @@ function showTerminalLoading(callback) {
     }, 150);
 }
 
-// ============ 🛰 扫描数据角标时钟（主页地图卡 / 监测面板） ============
+// ============ � 播放器音量控制（含静音记忆） ============
+function bindPlayerVolume(audio, slider, toggle, storageKey) {
+    if (!audio || !slider) return;
+    const load = () => {
+        let v = 0.3;
+        try { const s = parseFloat(localStorage.getItem(storageKey)); if (!isNaN(s)) v = Math.max(0, Math.min(1, s)); } catch (e) {}
+        audio.volume = v; slider.value = Math.round(v * 100);
+        if (toggle) toggle.textContent = v <= 0 ? '🔇' : '🔊';
+    };
+    load();
+    slider.addEventListener('input', () => {
+        const v = slider.value / 100;
+        audio.volume = v;
+        try { localStorage.setItem(storageKey, String(v)); } catch (e) {}
+        if (toggle) toggle.textContent = v <= 0 ? '🔇' : '🔊';
+    });
+    if (toggle) toggle.addEventListener('click', () => {
+        if (audio.volume > 0) { audio.dataset.prevVol = audio.volume; audio.volume = 0; slider.value = 0; toggle.textContent = '🔇'; }
+        else { const v = parseFloat(audio.dataset.prevVol || '0.3') || 0.3; audio.volume = v; slider.value = Math.round(v * 100); toggle.textContent = '🔊'; }
+    });
+}
+
+// ============ 🕯 论坛鼠标烛火拖尾（仅桌面） ============
+function initCursorCandle() {
+    if (!window.matchMedia || !window.matchMedia('(hover: hover)').matches) return;
+    const forum = document.getElementById('forumContainer');
+    if (!forum) return;
+    let lastT = 0;
+    forum.addEventListener('mousemove', (e) => {
+        const now = Date.now();
+        if (now - lastT < 40) return;
+        lastT = now;
+        const p = document.createElement('span');
+        p.className = 'cursor-candle';
+        const s = (3 + Math.random() * 6);
+        p.style.left = (e.clientX - s / 2) + 'px';
+        p.style.top = (e.clientY - s / 2) + 'px';
+        p.style.width = p.style.height = s + 'px';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 1400);
+    });
+}
+
+// ============ �🛰 扫描数据角标时钟（主页地图卡 / 监测面板） ============
 function startScanMeta() {
     const els = [document.getElementById('homeMapMeta'), document.getElementById('signalMapMeta')].filter(Boolean);
     if (!els.length) return;
@@ -1235,6 +1293,79 @@ function renderArchiveList() {
     });
 }
 
+// ============ ⭐ 收藏分组系统 ============
+let activeFavGroup = '默认';
+function favGroups(uid) {
+    if (!uid) return {};
+    let fav = userFavorites[uid];
+    if (!fav) fav = userFavorites[uid] = {};
+    if (Array.isArray(fav)) { const arr = fav.slice(); fav = userFavorites[uid] = { '默认': arr }; }
+    if (!fav['默认']) fav['默认'] = [];
+    return fav;
+}
+function saveFav() { safeSet('xuju_favorites', userFavorites); }
+function isFavorited(uid, id) {
+    if (!uid || !id) return false;
+    const fav = userFavorites[uid];
+    if (!fav) return false;
+    if (Array.isArray(fav)) return fav.includes(id);
+    return Object.values(fav).some(a => Array.isArray(a) && a.includes(id));
+}
+function toggleFavorite(uid, id) {
+    const fav = favGroups(uid);
+    for (const g in fav) { const i = fav[g].indexOf(id); if (i > -1) { fav[g].splice(i, 1); saveFav(); return false; } }
+    fav['默认'].push(id); saveFav(); return true;
+}
+function moveFav(uid, id, group) {
+    const fav = favGroups(uid);
+    for (const g in fav) { const i = fav[g].indexOf(id); if (i > -1) fav[g].splice(i, 1); }
+    if (!fav[group]) fav[group] = [];
+    if (fav[group].indexOf(id) === -1) fav[group].push(id);
+    saveFav();
+}
+function favTitle(id) { const a = archiveData.find(x => x.id === id); if (a) return a.title; const p = forumPosts.find(x => x.id === id); if (p) return p.title; return id; }
+function favType(id) { if (archiveData.find(x => x.id === id)) return '档'; if (forumPosts.find(x => x.id === id)) return '帖'; return '·'; }
+function favBtnHtml(id, title) {
+    const uid = window.currentUser ? window.currentUser.id : '';
+    const on = isFavorited(uid, id);
+    return `<button class="fav-btn${on ? ' fav-on' : ''}" data-fav-id="${id}" data-fav-title="${String(title || '').replace(/"/g, '&quot;')}" type="button">${on ? '★ 已收藏' : '☆ 收藏'}</button>`;
+}
+function bindFavBtn(scope) {
+    if (!scope) return;
+    scope.querySelectorAll('.fav-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            const uid = window.currentUser ? window.currentUser.id : '';
+            if (!uid) { alert('请先登录终端再收藏'); return; }
+            const on = toggleFavorite(uid, b.dataset.favId);
+            b.textContent = on ? '★ 已收藏' : '☆ 收藏';
+            b.classList.toggle('fav-on', on);
+            if (typeof updateProfilePanel === 'function') updateProfilePanel();
+        });
+    });
+}
+function renderFavGroupsPanel() {
+    const uid = window.currentUser ? window.currentUser.id : '';
+    const wrap = document.getElementById('favGroups');
+    const listEl = document.getElementById('favList');
+    if (!wrap || !listEl) return;
+    const fav = favGroups(uid);
+    const groups = Object.keys(fav);
+    if (groups.indexOf(activeFavGroup) === -1) activeFavGroup = groups.length ? groups[0] : '默认';
+    wrap.innerHTML = groups.map(function(g) { return '<button class="fav-group-tab' + (g === activeFavGroup ? ' active' : '') + '" data-g="' + escapeHtml(g) + '" type="button">' + escapeHtml(g) + '<small>' + (fav[g] || []).length + '</small></button>'; }).join('');
+    const items = fav[activeFavGroup] || [];
+    listEl.innerHTML = items.length ? items.map(id => '<div class="fav-item"><span class="fav-type">' + favType(id) + '</span><span class="fav-name">' + favTitle(id) + '</span><button class="fav-cmd" data-act="move" data-id="' + id + '" type="button">⇄</button><button class="fav-cmd" data-act="del" data-id="' + id + '" type="button">✕</button></div>').join('') : '<div class="fav-empty">该分组暂无收藏</div>';
+    wrap.querySelectorAll('.fav-group-tab').forEach(b => b.addEventListener('click', function() { activeFavGroup = b.dataset.g; renderFavGroupsPanel(); }));
+    listEl.querySelectorAll('.fav-cmd').forEach(b => b.addEventListener('click', () => {
+        const id = b.dataset.id;
+        if (b.dataset.act === 'del') {
+            const fav = favGroups(uid); const i = fav[activeFavGroup].indexOf(id);
+            if (i > -1) { fav[activeFavGroup].splice(i, 1); saveFav(); renderFavGroupsPanel(); }
+        } else {
+            const g = prompt('移动到分组：', activeFavGroup);
+            if (g && g.trim()) { moveFav(uid, id, g.trim()); renderFavGroupsPanel(); }
+        }
+    }));
+}
 function openArchiveDetail(item) {
     addHistory(item.id);
     markRead('archive|' + item.id);
@@ -1273,9 +1404,22 @@ function openArchiveDetail(item) {
     // 终端实际滚动容器是 #terminalContainer（body 不滚动），必须同时锁定，否则滚轮会穿透到外部容器
     const tc = document.getElementById('terminalContainer');
     if (tc) tc.style.overflow = 'hidden';
-    content.innerHTML = `${header}<div style="line-height:1.7;color:var(--text-secondary);">${item.content}</div>`;
+    content.innerHTML = `${header}<div class="archive-fav-zone">${favBtnHtml(item.id, item.title)}</div><div style="line-height:1.7;color:var(--text-secondary);">${item.content}</div>`;
+    bindFavBtn(content);
+    // 断点续读：恢复上次阅读位置
+    lastArchiveScrollId = item.id;
+    const savedScroll = safeGetJSON('darkalley_archive_scroll', {});
+    if (savedScroll[item.id]) { requestAnimationFrame(() => { content.scrollTop = savedScroll[item.id]; }); }
 }
+let lastArchiveScrollId = null;
 function closeArchiveDetail() {
+    const content = document.getElementById('archiveDetailContent');
+    if (lastArchiveScrollId && content) {
+        const saved = safeGetJSON('darkalley_archive_scroll', {});
+        saved[lastArchiveScrollId] = content.scrollTop;
+        safeSet('darkalley_archive_scroll', saved);
+    }
+    lastArchiveScrollId = null;
     document.getElementById('archiveDetailModal').style.display = 'none';
     document.body.style.overflow = '';
     const tc = document.getElementById('terminalContainer');
@@ -1414,15 +1558,14 @@ function updateProfilePanel() {
     document.getElementById('profileName').textContent = window.currentUser.name;
     document.getElementById('profileId').textContent = window.currentUser.id;
     const uid = window.currentUser.id;
-    const favorites = userFavorites[uid] || [];
+    const fav = favGroups(uid);
+    const favorites = Object.values(fav).reduce((a, arr) => a.concat(arr), []);
     const history = userHistory[uid] || [];
     const completed = Math.min((missions || []).filter(m => m.status === '进行中' || m.status.includes('已')).length + 2, 9);
     document.getElementById('statMission').textContent = completed;
     document.getElementById('statFav').textContent = favorites.length;
     document.getElementById('statHistory').textContent = history.length;
-    document.getElementById('favList').innerHTML = favorites.length
-        ? favorites.map(id => `<div>◎ ${id}</div>`).join('')
-        : '<div>暂无收藏记录</div>';
+    renderFavGroupsPanel();
     document.getElementById('historyList').innerHTML = history.length
         ? history.slice(0, 5).map(id => `<div>⏱ ${id}</div>`).join('')
         : '<div>暂无查看记录</div>';
@@ -2252,8 +2395,32 @@ try {
         moreBtn.textContent = more.classList.contains('open') ? '△ 收起版块' : '☰ 更多版块';
     });
     updatePortalStatus();
+    initCursorCandle();
+    // 收藏：新建分组
+    const favNewBtn = document.getElementById('favNewGroupBtn');
+    if (favNewBtn) favNewBtn.addEventListener('click', () => {
+        const uid = window.currentUser ? window.currentUser.id : '';
+        const inp = document.getElementById('favNewGroupInput');
+        const name = (inp && inp.value || '').trim();
+        if (!uid) { alert('请先登录'); return; }
+        if (!name) { alert('请输入分组名'); return; }
+        const fav = favGroups(uid);
+        if (!fav[name]) fav[name] = [];
+        saveFav(); activeFavGroup = name;
+        if (inp) inp.value = '';
+        renderFavGroupsPanel();
+    });
     // 🛠️ 修复：.modal-overlay 是 fixed，但 .main-container 的 backdrop-filter 会劫持其包含块，导致弹窗随外层滚动上移/消失。移到 body 顶层（body 无 transform/filter），fixed 相对视口正确。
     document.querySelectorAll('.modal-overlay').forEach(m => { if (m.parentElement && m.parentElement !== document.body) document.body.appendChild(m); });
+    // ESC 关闭弹窗
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        const m = document.getElementById('archiveDetailModal');
+        if (m && m.style.display !== 'none') { closeArchiveDetail(); return; }
+        ['editModal', 'postEditModal'].forEach(id => { const el = document.getElementById(id); if (el && el.style.display !== 'none') el.style.display = 'none'; });
+        document.body.style.overflow = '';
+        const tc = document.getElementById('terminalContainer'); if (tc) tc.style.overflow = '';
+    });
     const shiChenEl = document.getElementById('shiChen');
     if (shiChenEl) { const updShi = () => shiChenEl.textContent = shiChenLabel(); updShi(); setInterval(updShi, 60000); }
     startForumClock();

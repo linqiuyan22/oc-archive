@@ -1256,6 +1256,71 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
 .vinyl-player.playing .record-disc { animation: spin 4s linear infinite; }
 .vinyl-player.playing .mini-play-btn { background: #000; color: #fff; border: 1px solid var(--accent-red); }
 .vinyl-player.playing .track-info span:last-child { color: #fff; }
+/* 收藏分组 */
+.archive-fav-zone { margin: 4px 0 14px; }
+.post-detail-actions { margin: 10px 0 4px; }
+.fav-btn {
+    display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+    border: 1px solid rgba(207,42,42,0.4); background: rgba(207,42,42,0.08); color: var(--accent-red);
+    padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; transition: 0.2s;
+}
+.fav-btn:hover { background: rgba(207,42,42,0.2); }
+.fav-btn.fav-on { background: rgba(207,42,42,0.25); color: #ffd7a0; border-color: var(--accent-red); }
+.fav-groups { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.fav-group-tab {
+    cursor: pointer; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-secondary);
+    padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; transition: 0.2s;
+}
+.fav-group-tab small { margin-left: 4px; color: var(--accent-red); }
+.fav-group-tab.active { border-color: var(--accent-red); background: rgba(207,42,42,0.15); color: #fff; }
+.fav-new-group { display: flex; gap: 6px; margin-bottom: 12px; }
+.fav-new-group input {
+    flex: 1; min-width: 0; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-primary);
+    border-radius: 8px; padding: 6px 10px; font-size: 0.78rem; outline: none;
+}
+.fav-new-group input:focus { border-color: var(--accent-red); }
+.fav-new-group .admin-btn { padding: 5px 12px; font-size: 0.72rem; }
+.fav-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-bottom: 6px;
+    border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.22);
+}
+.fav-type { flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px; background: rgba(207,42,42,0.15); color: var(--accent-red); font-size: 0.62rem; display: flex; align-items: center; justify-content: center; }
+.fav-name { flex: 1; min-width: 0; font-size: 0.8rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav-cmd { flex-shrink: 0; cursor: pointer; border: none; background: none; color: var(--text-muted); font-size: 0.85rem; padding: 2px 4px; }
+.fav-cmd:hover { color: var(--accent-red); }
+.fav-empty { color: var(--text-muted); padding: 8px 0; font-size: 0.78rem; }
+/* 播放器音量条 */
+.vol-wrap { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.vol-toggle {
+    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; cursor: pointer; line-height: 1;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.05); color: var(--text-secondary);
+    font-size: 0.7rem; display: flex; align-items: center; justify-content: center; transition: 0.2s; padding: 0;
+}
+.vol-toggle:hover { color: #fff; border-color: var(--accent-red); }
+.vol-slider {
+    -webkit-appearance: none; appearance: none; width: 52px; height: 3px; border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent-red), rgba(207,42,42,0.35)); cursor: pointer; outline: none;
+}
+.vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 11px; height: 11px; border-radius: 50%;
+    background: #fff; border: 1px solid var(--accent-red); box-shadow: 0 0 6px rgba(207,42,42,0.7);
+}
+.vol-slider::-moz-range-thumb { width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 1px solid var(--accent-red); }
+/* 论坛鼠标烛火拖尾（仅桌面 hover 设备） */
+.cursor-candle {
+    position: fixed; pointer-events: none; z-index: 99999; border-radius: 50%; mix-blend-mode: screen;
+    background: radial-gradient(circle, rgba(255,190,130,0.95), rgba(207,42,42,0.4) 60%, transparent);
+    box-shadow: 0 0 8px rgba(255,160,90,0.6);
+    animation: candleFloat 1.4s ease-out forwards;
+}
+@keyframes candleFloat {
+    0% { opacity: 0.9; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-26px) scale(0.35); }
+}
+@media (max-width: 760px) {
+    .vol-slider { width: 38px; }
+    .vol-toggle { width: 22px; height: 22px; font-size: 0.75rem; }
+}
 /* 播放器收起按钮（手机端/桌面通用） */
 .player-min-btn {
     width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; cursor: pointer; line-height: 1;
