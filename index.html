@@ -122,13 +122,13 @@
                     <h4>每日一签</h4>
                     <div id="dailyFortune" class="daily-fortune"></div>
                 </div>
+                </div>
+                <button class="sidebar-more-btn" id="sidebarMoreBtn" type="button">☰ 更多版块</button>
                 <div class="sidebar-box sidebar-alert">
                     <h4>⚠ 巷规</h4>
                     <p class="announce-text">本巷为匿名讨论区，请勿暴露真实身份与位置。深夜发帖请谨慎，部分帖子可能被莫名删除。</p>
                     <p class="announce-rule">— 夜路莫回头 —</p>
                 </div>
-                </div>
-                <button class="sidebar-more-btn" id="sidebarMoreBtn" type="button">☰ 更多版块</button>
             </aside>
             <main class="forum-main">
                 <section id="postListView">
@@ -232,7 +232,10 @@
                 </div>
                 <div class="form-group">
                     <label class="input-label">验证口令</label>
-                    <input type="password" id="passwordInput" placeholder="口令">
+                    <div class="password-wrap">
+                        <input type="password" id="passwordInput" placeholder="口令" autocomplete="off">
+                        <button type="button" id="pwdToggleBtn" class="pwd-toggle" title="显示/隐藏口令">👁</button>
+                    </div>
                 </div>
                 <button id="loginBtn">◈ 连接终端 ◈</button>
                 <div class="login-hint">访客：QYXH-GUEST / visitor<br>管理员：ADMIN-001 / admin123</div>
@@ -272,7 +275,6 @@
                 <button class="nav-btn" data-panel="archive"><span class="nav-ico">☰</span>档案</button>
                 <button class="nav-btn" data-panel="experiment"><span class="nav-ico">⚗</span>实验</button>
                 <button class="nav-btn" data-panel="entities"><span class="nav-ico">✦</span>图鉴</button>
-                <button class="nav-btn" data-panel="action"><span class="nav-ico">⚔</span>行动</button>
                 <button class="nav-btn" data-panel="shop"><span class="nav-ico">◬</span>终端商城</button>                <button class="nav-btn" data-panel="lingshi"><span class="nav-ico">◈</span>灵犀</button>
                 <button class="nav-btn" data-panel="profile"><span class="nav-ico">◉</span>个人</button>
                 <button class="nav-btn admin-only" data-panel="admin" style="display:none;"><span class="nav-ico">⚙</span>管理</button>
@@ -409,11 +411,16 @@
                         <button class="cat-tab" data-category="人物档案">人物档案</button>
                         <button class="cat-tab" data-category="收容物分支">收容物分支</button>
                         <button class="cat-tab" data-category="事件分支">事件分支</button>
+                        <button class="cat-tab" data-category="行动记录">⚔ 行动记录</button>
                     </div>
                     <div class="archive-search"><span class="prompt">[query]</span><input type="text" id="archiveSearchInput" placeholder="搜索..."></div>
                     <div class="archive-container" id="archiveContainer">
                         <div class="archive-sidebar" id="archiveSidebar"></div>
                         <div class="archive-grid" id="archiveGrid"></div>
+                    </div>
+                    <div id="archiveActionView" style="display:none;">
+                        <div class="scp-header"><span>⚔ 收容行动记录</span><span class="scp-hint">外勤三处 · 5 起 · 与档案联动</span></div>
+                        <div id="archiveActionList" class="action-list"></div>
                     </div>
                 </div>
                 <div class="panel" id="lingshiPanel">
@@ -464,10 +471,6 @@
                         <span class="legend-item"><span class="legend-dot lv-ji"></span>己阶</span>
                     </div>
                     <div id="entityList" class="entity-list"></div>
-                </div>
-                <div class="panel" id="actionPanel">
-                    <div class="scp-header"><span>⚔ 收容行动记录</span><span class="scp-hint">外勤三处 · 5 起</span></div>
-                    <div id="actionList" class="action-list"></div>
                 </div>
                 <div class="panel" id="collectionsPanel">
                     <div class="scp-header"><span>📚 故事合集</span><span class="scp-hint">拼图式阅读 · 追踪同一条线索</span></div>

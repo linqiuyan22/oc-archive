@@ -175,10 +175,10 @@ function startStars() {
     const ctx = canvas.getContext('2d');
     function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.removeEventListener('resize', resizeCanvas); window.addEventListener('resize', resizeCanvas); resizeCanvas();
-    const stars = Array.from({length:80}, ()=>({
+    const stars = Array.from({length:56}, ()=>({
         x: Math.random()*canvas.width, y: Math.random()*canvas.height,
-        radius: 0.5 + Math.random()*1.5, speed: 0.2 + Math.random()*0.4,
-        opacity: 0.2 + Math.random()*0.3
+        radius: 0.5 + Math.random()*1.3, speed: 0.2 + Math.random()*0.4,
+        opacity: 0.25 + Math.random()*0.35
     }));
     let t = 0;
     function draw() {
@@ -189,8 +189,7 @@ function startStars() {
             const alpha = s.opacity * (0.6 + 0.4 * Math.sin(t + s.x));
             ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI*2);
             ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(207, 42, 42, 0.2)';
-            ctx.fill(); ctx.shadowBlur = 0;
+            ctx.fill();
         });
         t += 0.05;
         starAnimId = requestAnimationFrame(draw);
@@ -741,7 +740,7 @@ window.switchPanel = function(name) {
         if (!Array.isArray(archiveData) || archiveData.length === 0) {
             loadArchive();
         }
-        renderArchiveList();
+        if (activeCategory === '行动记录') { showArchiveActions(); } else { renderArchiveList(); }
     }
     if (name === 'admin') renderAdminList();
     if (name === 'profile') updateProfilePanel();
@@ -754,7 +753,6 @@ window.switchPanel = function(name) {
     if (name === 'bureau') renderBureau();
     if (name === 'experiment') renderExperimentRecords();
     if (name === 'entities') renderEntities();
-    if (name === 'action') renderActionRecords();
     if (name === 'collections') renderCollections();
     if (name === 'shop') renderShop();
 }
@@ -769,6 +767,7 @@ function bindTerminalNav() {
         tab.classList.add('active');
         activeCategory = tab.dataset.category || 'all';
         activeSubCategory = 'all';
+        if (activeCategory === '行动记录') { showArchiveActions(); return; }
         renderArchiveList();
     }));
     document.getElementById('archiveSearchInput').addEventListener('input', renderArchiveList);
@@ -872,9 +871,13 @@ function renderArchiveList() {
     if (!Array.isArray(archiveData) || archiveData.length === 0) {
         loadArchive();
     }
+    if (activeCategory === '行动记录') { showArchiveActions(); return; }
     const searchInput = document.getElementById('archiveSearchInput');
     const container = document.getElementById('archiveContainer');
     if (!searchInput || !container) return;
+    const actionView = document.getElementById('archiveActionView');
+    if (container) container.style.display = '';
+    if (actionView) actionView.style.display = 'none';
 
     const keyword = searchInput.value.trim().toLowerCase();
     let filtered = [...archiveData];
@@ -1341,7 +1344,42 @@ const WELCOME_MESSAGES = [
     "欢迎登入，屏蔽层生效，外部无法侦测。",
     "欢迎登入，终端界面加载完毕，开始工作吧。"
 ];
-function startTypewriter() { const el = document.getElementById('typewriterText'); const msg = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)]; el.textContent = ''; let i=0; const t = setInterval(() => { if(i<msg.length) el.textContent += msg.charAt(i++); else clearInterval(t); }, 60); }
+function startTypewriter() { const el = document.getElementById('typewriterText'); const msg = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)]; el.textContent = ''; let i=0; const t = setInterval(() => { if(i<msg.length) { el.textContent += msg.charAt(i++); playTypeKey(); } else clearInterval(t); }, 60); }
+
+// ============ ⌨️ 打字机音效 + 口令显隐 ============
+let typeCtx = null;
+function playTypeKey() {
+    try {
+        if (!typeCtx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; typeCtx = new AC(); }
+        if (typeCtx.state === 'suspended') typeCtx.resume();
+        const now = typeCtx.currentTime;
+        const osc = typeCtx.createOscillator();
+        const gain = typeCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(900 + Math.random() * 500, now);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        osc.connect(gain); gain.connect(typeCtx.destination);
+        osc.start(now); osc.stop(now + 0.03);
+    } catch (e) {}
+}
+function bindPasswordToggle() {
+    const input = document.getElementById('passwordInput');
+    const btn = document.getElementById('pwdToggleBtn');
+    if (!input || !btn) return;
+    btn.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.textContent = show ? '🙈' : '👁';
+    });
+    input.addEventListener('keydown', playTypeKey);
+}
+function bindTypeKeyInputs() {
+    ['lingshiInput', 'internalCommentInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', playTypeKey);
+    });
+}
 
 // ============ 🏛️ 总局六大司局 ============
 function renderBureau() {
@@ -1446,11 +1484,13 @@ function renderEntities() {
 }
 
 // ============ ⚔️ 收容行动记录 ============
-function renderActionRecords() {
-    const list = document.getElementById('actionList');
+function renderActionList(list) {
     if (!list) return;
     const records = ACTION_RECORDS || [];
-    list.innerHTML = records.map(rec => `
+    list.innerHTML = records.map(rec => {
+        const relArchives = (rec.links || []).map(id => (archiveData || []).find(a => a.id === id)).filter(Boolean);
+        const relHtml = relArchives.length ? `<div class="action-links">📎 关联档案：${relArchives.map(a => `<button class="action-link" data-id="${a.id}" type="button">${(a.title || a.id).replace(/^.+·\s*/, '')}</button>`).join('')}</div>` : '';
+        return `
         <div class="action-item">
             <div class="action-head">
                 <span class="action-id">${rec.id}</span>
@@ -1458,6 +1498,7 @@ function renderActionRecords() {
             </div>
             <div class="action-meta"><span>执行单位：${rec.unit}</span></div>
             <div class="action-meta"><span>行动日期：${rec.date}</span><span>地点：${rec.location}</span></div>
+            ${relHtml}
             <button class="action-expand-btn" type="button">展开行动详情 ▾</button>
             <div class="action-detail">
                 <div class="action-block"><h4>参与人员</h4><div class="action-members">${rec.members.map(m => `<span class="action-member">${m}</span>`).join('')}</div></div>
@@ -1468,8 +1509,15 @@ function renderActionRecords() {
                 <div class="action-block"><h4>结论</h4><p>${rec.conclusion}</p></div>
                 <div class="action-block"><h4>备注</h4><p class="action-notes">${rec.notes}</p></div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
+    list.querySelectorAll('.action-link').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const a = (archiveData || []).find(x => x.id === btn.dataset.id);
+            if (a) openArchiveDetail(a);
+        });
+    });
     list.querySelectorAll('.action-expand-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const item = this.closest('.action-item'); if (!item) return;
@@ -1483,9 +1531,15 @@ function renderActionRecords() {
         });
     });
 }
+function showArchiveActions() {
+    const container = document.getElementById('archiveContainer');
+    const view = document.getElementById('archiveActionView');
+    if (container) container.style.display = 'none';
+    if (view) { view.style.display = 'block'; renderActionList(document.getElementById('archiveActionList')); }
+}
 
 // ============ ⌨️ 面板快捷键 + 主页内嵌切换 ============
-const NAV_KEYMAP = { '1':'home','2':'monitor','3':'containment','4':'archive','5':'experiment','6':'entities','7':'action','8':'lingshi','9':'profile' };
+const NAV_KEYMAP = { '1':'home','2':'monitor','3':'containment','4':'archive','5':'experiment','6':'entities','7':'lingshi','8':'profile' };
 function bindKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         if (!NAV_KEYMAP[e.key]) return;
@@ -1863,6 +1917,8 @@ try {
     bindGameView();
     bindFolkEntries();
     bindListingForm();
+    bindPasswordToggle();
+    bindTypeKeyInputs();
     startStars();
     setupForumMiniPlayer();
     renderFeaturedPosts();
