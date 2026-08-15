@@ -198,10 +198,9 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
 .online-empty { color: var(--text-muted); }
 .post-cover {
     width: 120px; height: 96px; flex-shrink: 0; border-radius: 6px;
-    background-size: cover; background-position: center;
-    border: 1px solid var(--border-color); position: relative;
+    object-fit: cover; object-position: center; display: block;
+    border: 1px solid var(--border-color); background: #111;
 }
-.post-cover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.4), transparent 55%); border-radius: 6px; }
 .post-header { display: flex; justify-content: space-between; margin-bottom: 8px; position: relative; z-index: 1; }
 .post-author { color: var(--accent-red); font-weight: 500; font-size: 0.9rem; }
 .post-meta { display: flex; align-items: center; gap: 10px; }

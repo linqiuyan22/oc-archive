@@ -212,8 +212,7 @@ function setupForumMiniPlayer() {
     const playerContainer = document.getElementById('forumVinylPlayer');
     if (!FORUM_AUDIO_SRC) { if(playerContainer) playerContainer.style.opacity = '0.4'; return; }
     
-    sourceEl.src = FORUM_AUDIO_SRC;
-    audio.load(); audio.volume = 0.3;
+    sourceEl.src = FORUM_AUDIO_SRC; audio.volume = 0.3;
     btn.addEventListener('click', () => {
         if (audio.paused) {
             audio.play().then(() => {
@@ -236,8 +235,7 @@ function setupMiniTerminalPlayer() {
         return;
     }
     if (!TERMINAL_AUDIO_SRC) { playerContainer.style.opacity = '0.4'; return; }
-    sourceEl.src = TERMINAL_AUDIO_SRC;
-    audio.load(); audio.volume = 0.3;
+    sourceEl.src = TERMINAL_AUDIO_SRC; audio.volume = 0.3;
     btn.addEventListener('click', () => {
         if (audio.paused) {
             audio.play().then(() => {
@@ -298,7 +296,7 @@ function renderPostList() {
             const cover = p.image && String(p.image).trim() ? String(p.image).trim() : 'images/feature1.jpg';
             return `
             <div class="post-item" data-id="${p.id}">
-                ${p.image ? `<div class="post-cover" style="background-image:url('${cover}')"></div>` : ''}
+                ${p.image ? `<img class="post-cover" src="${cover}" alt="" loading="lazy" decoding="async">` : ''}
                 <div class="post-content">
                     <div class="post-header">
                         <div class="post-author">${p.author}</div>
@@ -985,7 +983,7 @@ function renderArchiveList() {
         const tags = Array.isArray(item.tags) ? item.tags.slice(0, 3) : [item.subCategory || '档案'];
 
         card.innerHTML = `
-            <img class="archive-card-img" src="${image}" alt="${item.title}" onerror="this.src='images/default-archive.jpg'">
+            <img class="archive-card-img" src="${image}" alt="${item.title}" loading="lazy" decoding="async" onerror="this.src='images/default-archive.jpg'">
             <div class="archive-card-body">
                 <div class="archive-card-title">${item.title}</div>
                 <div class="archive-card-summary">${item.summary || ''}</div>
@@ -1011,7 +1009,7 @@ function openArchiveDetail(item) {
     const subtitle = item.subtitle || '';
     const header = isPerson ? `
         <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border-color);">
-            <img src="${imagePath}" alt="${item.title}" style="width:200px; height:200px; object-fit:cover; border-radius:12px; border:1px solid var(--border-color); background:#111;" onerror="this.src='images/default-archive.jpg'">
+            <img src="${imagePath}" alt="${item.title}" loading="lazy" decoding="async" style="width:200px; height:200px; object-fit:cover; border-radius:12px; border:1px solid var(--border-color); background:#111;" onerror="this.src='images/default-archive.jpg'">
             <div style="flex:1; min-width:0;">
                 <h2 style="color:#fff; margin:0 0 8px;">${item.title}</h2>
                 <div style="color:var(--text-muted); margin-bottom:8px;">${item.category}</div>
@@ -1022,7 +1020,7 @@ function openArchiveDetail(item) {
     ` : `
         <div style="border-bottom:1px solid var(--border-color);padding-bottom:15px;margin-bottom:15px;">
             <div style="display:flex; align-items:flex-start; gap:16px;">
-                ${item.image ? `<img src="${imagePath}" alt="${item.title}" style="width:200px; height:140px; object-fit:cover; border-radius:10px; border:1px solid var(--border-color); background:#111;" onerror="this.src='images/default-archive.jpg'">` : ''}
+                ${item.image ? `<img src="${imagePath}" alt="${item.title}" loading="lazy" decoding="async" style="width:200px; height:140px; object-fit:cover; border-radius:10px; border:1px solid var(--border-color); background:#111;" onerror="this.src='images/default-archive.jpg'">` : ''}
                 <div style="flex:1; min-width:0;">
                     <h2 style="color:#fff; margin:0 0 8px;">${item.title}</h2>
                     <div style="color:var(--text-muted);">${item.category}</div>
