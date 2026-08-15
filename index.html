@@ -125,7 +125,14 @@
                 <section id="postDetailView" class="post-detail-container detail-overlay" style="display:none;">
                     <button class="back-btn" id="backToListBtn">← 返回</button>
                     <div id="postDetailContent"></div>
-                    <div class="comment-section"><h3>回复</h3><div id="commentList"></div><div class="comment-form"><input type="text" id="commentInput" placeholder="说点什么吧..."><button id="submitCommentBtn">发表</button></div></div>
+                    <div class="comment-section"><h3>回复</h3><div id="commentList"></div>
+                        <div class="comment-form">
+                            <div id="commentReplyHint" class="reply-hint" style="display:none;">↩ 正在回复 <span id="replyHintText"></span><button id="cancelReplyBtn" type="button">✕ 取消</button></div>
+                            <input type="text" id="commentInput" placeholder="说点什么吧...">
+                            <button id="submitCommentBtn">发表</button>
+                        </div>
+                        <button class="back-to-list" id="backToListBottom" type="button">↑ 返回列表</button>
+                    </div>
                 </section>
                 <section id="newPostForm" class="new-post-container" style="display:none;">
                     <button class="back-btn" id="cancelNewPostBtn">← 取消</button>

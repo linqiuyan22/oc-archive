@@ -479,7 +479,7 @@ window.showPostDetail = function(id) {
                     <div class="post-detail-meta">
                         <span>${post.timestamp}</span>
                         <span class="post-board-tag">${post.board || '综合'}</span>
-                        <span class="post-stat">👁 ${(post.views||0)} 浏览 · 💬 ${commentCount} 回复</span>
+                        <span class="post-stat">👁 ${(post.views||0)} 浏览 · 💬 ${commentCount} 回复 · <button class="post-like-btn" type="button">♡ ${post.likes || 0}</button></span>
                     </div>
                 </div>
             </div>
@@ -488,31 +488,68 @@ window.showPostDetail = function(id) {
         <div class="post-detail-body">
             ${bodyHtml}
         </div>`;
+    const likeBtn = document.querySelector('.post-like-btn');
+    if (likeBtn) likeBtn.addEventListener('click', () => {
+        post.likes = (post.likes || 0) + 1;
+        savePosts();
+        likeBtn.textContent = '❤ ' + post.likes;
+        likeBtn.classList.add('liked');
+    });
     renderComments(post);
 }
 
 function renderComments(post) {
     const opName = post.author;
-    document.getElementById('commentList').innerHTML = (post.comments||[]).map((c, idx) => {
+    const listEl = document.getElementById('commentList');
+    const comments = post.comments || [];
+    const likedSet = safeGetJSON('darkalley_liked', {});
+    if (!comments.length) { listEl.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;">还没有回复，来抢个沙发？</div>'; return; }
+    listEl.innerHTML = comments.map((c, idx) => {
+        const floor = idx + 2;
         const isOP = !!c.isOP || c.user === opName;
         const opBadge = isOP ? '<span class="op-badge">楼主</span>' : '';
         const avatarTone = isOP ? 'op' : (idx % 3 === 0 ? 'tone-a' : idx % 3 === 1 ? 'tone-b' : 'tone-c');
+        const quoteHtml = c.replyTo ? `<div class="quote-block"><span class="quote-arrow">↩</span>回复 <b>${c.replyTo.user}</b>：${c.replyTo.text}</div>` : '';
+        const likeKey = post.id + '|' + idx;
+        const liked = !!likedSet[likeKey];
         return `
         <div class="thread-card${isOP ? ' op-comment' : ''}">
             <div class="thread-avatar ${avatarTone}">${(c.user||'匿').slice(-2).slice(0,1)}</div>
             <div class="thread-main">
                 <div class="thread-card-header">
                     <strong>${c.user}</strong>${opBadge}
-                    <small>${c.time}${c.floor ? ` · ${c.floor}楼` : ''}</small>
+                    <small>${c.time} · ${floor}楼</small>
                 </div>
+                ${quoteHtml}
                 <p>${c.text}</p>
+                <div class="thread-actions">
+                    <button class="cmt-btn quote-btn" data-idx="${idx}" type="button">↩ 引用</button>
+                    <button class="cmt-btn like-btn ${liked ? 'liked' : ''}" data-idx="${idx}" type="button">${liked ? '❤' : '♡'} ${c.likes || 0}</button>
+                </div>
             </div>
-        </div>
-    `;
+        </div>`;
     }).join('');
-    if (!(post.comments||[]).length) {
-        document.getElementById('commentList').innerHTML = '<div style="color:var(--text-muted);padding:12px 0;">还没有回复，来抢个沙发？</div>';
-    }
+    listEl.querySelectorAll('.quote-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const c = comments[+btn.dataset.idx]; if (!c) return;
+            window.pendingReply = { user: c.user, text: c.text.slice(0, 50) + (c.text.length > 50 ? '…' : ''), floor: (+btn.dataset.idx) + 2 };
+            const hint = document.getElementById('commentReplyHint');
+            if (hint) { hint.style.display = 'flex'; document.getElementById('replyHintText').textContent = `@${c.user}（${(+btn.dataset.idx)+2}楼）`; }
+            const input = document.getElementById('commentInput');
+            input.placeholder = `回复 @${c.user}…`; input.value = ''; input.focus();
+        });
+    });
+    listEl.querySelectorAll('.like-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const c = comments[+btn.dataset.idx]; if (!c) return;
+            const key = post.id + '|' + btn.dataset.idx;
+            if (likedSet[key]) return;
+            likedSet[key] = true;
+            c.likes = (c.likes || 0) + 1;
+            savePosts(); safeSet('darkalley_liked', likedSet);
+            renderComments(post);
+        });
+    });
 }
 
 function backToList() {
@@ -550,9 +587,20 @@ document.getElementById('submitCommentBtn').addEventListener('click', () => {
     const postId = document.getElementById('postDetailView').dataset.currentId;
     const post = forumPosts.find(p => p.id === postId);
     if (!post) return;
-    post.comments.push({ user: forumNickname, text, time:new Date().toLocaleString('zh-CN') });
+    const replyTo = window.pendingReply || null;
+    window.pendingReply = null;
+    const hint = document.getElementById('commentReplyHint'); if (hint) hint.style.display = 'none';
+    document.getElementById('commentInput').placeholder = '说点什么吧...';
+    post.comments = post.comments || [];
+    post.comments.push({ user: forumNickname, text, time:new Date().toLocaleString('zh-CN'), likes: 0, replyTo });
     savePosts(); renderComments(post); document.getElementById('commentInput').value = '';
 });
+document.getElementById('cancelReplyBtn').addEventListener('click', () => {
+    window.pendingReply = null;
+    document.getElementById('commentReplyHint').style.display = 'none';
+    document.getElementById('commentInput').placeholder = '说点什么吧...';
+});
+document.getElementById('backToListBottom').addEventListener('click', backToList);
 ['forumHomeLink','backToListBtn','cancelNewPostBtn','profileBackBtn'].forEach(id => {
     const el = document.getElementById(id); if(el) el.addEventListener('click', (e) => { if(e) e.preventDefault(); backToList(); });
 });
