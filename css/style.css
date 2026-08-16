@@ -334,6 +334,24 @@ input:focus { border-color: var(--accent-red); box-shadow: 0 0 10px var(--accent
 #loginBtn:hover { opacity: 0.8; box-shadow: 0 0 15px var(--accent-glow); }
 .login-hint { margin-top: 15px; font-size: 0.8rem; color: var(--text-muted); text-align: center; }
 .error-msg { color: var(--accent-red); font-size:0.85rem; min-height:20px; text-align: center; }
+/* 账号登录/注册 */
+.login-tabs { display: flex; gap: 8px; margin: 4px 0 16px; border-bottom: 1px solid var(--border-color); }
+.login-tab { flex: 1; padding: 9px; text-align: center; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; letter-spacing: 0.25em; transition: 0.2s; }
+.login-tab:hover { color: var(--text-primary); }
+.login-tab.active { color: var(--accent-red); border-bottom-color: var(--accent-red); font-weight: 700; }
+.reg-roletype { display: flex; gap: 16px; }
+.reg-role-opt { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer; }
+.reg-role-opt:hover { color: var(--text-primary); }
+.reg-role-opt input { accent-color: var(--accent-red); }
+#registerBtn { background: var(--accent-red); color: #000; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; transition: 0.2s; margin-top: 5px; border: none; }
+#registerBtn:hover { opacity: 0.8; box-shadow: 0 0 15px var(--accent-glow); }
+#loginForm select, #registerForm select { background: var(--bg-glass); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 0.85rem; }
+/* 论坛侧栏身份区 */
+.forum-user-sub { font-size: 0.62rem; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4; }
+.forum-login-btn { width: 100%; margin-top: 2px; padding: 7px; border: 1px solid var(--accent-red); background: rgba(207,42,42,0.12); color: var(--accent-red); border-radius: 8px; cursor: pointer; font-size: 0.8rem; transition: 0.2s; }
+.forum-login-btn:hover { background: var(--accent-red); color: #000; }
+.forum-logout-btn { width: 100%; margin-top: 6px; padding: 5px; border: 1px solid var(--border-color); background: none; color: var(--text-muted); border-radius: 8px; cursor: pointer; font-size: 0.72rem; }
+.forum-logout-btn:hover { color: var(--accent-red); border-color: var(--accent-red); }
 
 /* 终端 */
 #terminalContainer {

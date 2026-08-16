@@ -1,6 +1,6 @@
 // ============ 全局变量与用户系统 ============
 const VALID_USERS = {
-    'ADMIN-001': { pass:'admin123', name:'系统管理员', isAdmin:true },
+    'HUAXU': { pass:'hx1234', name:'系统管理员', isAdmin:true },
     'QYXH-GUEST': { pass:'visitor', name:'临时访客', isAdmin:false },
     'L-09-01-S': { pass:'fengyu', name:'苏晚眠', isAdmin:false },
     'L-09-02-C': { pass:'lingxiu', name:'沈绛离', isAdmin:false },
@@ -32,6 +32,8 @@ let editingId = null;
 let currentInternalPostId = null; 
 
 let forumNickname = localStorage.getItem('darkalley_nickname') || '匿名_' + Math.floor(Math.random()*0xffff).toString(16);
+// 论坛发言身份：已登录用账号绑定的身份名，游客用匿名
+function currentIdentityName() { return window.currentUser ? window.currentUser.name : forumNickname; }
 let forumFriends = safeGetJSON('darkalley_friends', []);
 let forumMessages = safeGetJSON('darkalley_messages', []);
 let lingshiMessages = safeGetJSON('xuju_lingshi', JSON.parse(JSON.stringify(DEFAULT_CHANNELS)));
@@ -772,15 +774,17 @@ if (forumSearchInput) forumSearchInput.addEventListener('input', () => {
     renderPostList();
 });
 document.getElementById('submitNewPostBtn').addEventListener('click', () => {
+    if (!window.currentUser) { alert('请先登录再发帖'); openAwakenModal(); return; }
     const title = document.getElementById('newPostTitle').value.trim();
     const content = document.getElementById('newPostContent').value.trim();
     const board = document.getElementById('newPostBoard').value;
     if (!title || !content) return alert('请填写标题和内容');
-    forumPosts.push({ id:'p'+Date.now(), title, content, board, author: forumNickname, timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
+    forumPosts.push({ id:'p'+Date.now(), title, content, board, author: currentIdentityName(), timestamp:new Date().toLocaleString('zh-CN'), comments:[] });
     currentPostPage = 1;
     addPoints(10); savePosts(); backToList();
 });
 document.getElementById('submitCommentBtn').addEventListener('click', () => {
+    if (!window.currentUser) { alert('请先登录再回复'); openAwakenModal(); return; }
     const text = document.getElementById('commentInput').value.trim();
     if (!text) return;
     const postId = document.getElementById('postDetailView').dataset.currentId;
@@ -791,7 +795,7 @@ document.getElementById('submitCommentBtn').addEventListener('click', () => {
     const hint = document.getElementById('commentReplyHint'); if (hint) hint.style.display = 'none';
     document.getElementById('commentInput').placeholder = '说点什么吧...';
     post.comments = post.comments || [];
-    post.comments.push({ user: forumNickname, text, time:new Date().toLocaleString('zh-CN'), likes: 0, replyTo });
+    post.comments.push({ user: currentIdentityName(), text, time:new Date().toLocaleString('zh-CN'), likes: 0, replyTo });
     addPoints(5); savePosts(); renderComments(post); document.getElementById('commentInput').value = '';
 });
 document.getElementById('cancelReplyBtn').addEventListener('click', () => {
@@ -820,17 +824,17 @@ function backToProfile() {
     renderForumProfile();
 }
 function renderForumProfile() {
-    document.getElementById('forumProfileName').textContent = forumNickname;
+    document.getElementById('forumProfileName').textContent = currentIdentityName();
     const level = Math.min(10, Math.floor(checkinState.total / 5) + 1);
     document.getElementById('forumProfileSub').textContent = `已签到 ${checkinState.total} 天 · Lv.${level}`;
     // 概览
-    const myPostCount = forumPosts.filter(p => p.author === forumNickname).length;
+    const myPostCount = forumPosts.filter(p => p.author === currentIdentityName()).length;
     document.getElementById('ovPosts').textContent = myPostCount;
     document.getElementById('ovCheckin').textContent = checkinState.total;
     document.getElementById('ovStreak').textContent = checkinState.streak;
     document.getElementById('ovPoints').textContent = checkinState.points;
     // 我的帖子
-    const mine = forumPosts.filter(p => p.author === forumNickname);
+    const mine = forumPosts.filter(p => p.author === currentIdentityName());
     document.getElementById('mypostsList').innerHTML = mine.length ? mine.map(p => `
         <div class="my-post-item">
             <span class="my-post-board">${p.board || '综合'}</span>
@@ -847,7 +851,7 @@ function renderForumProfile() {
 }
 window.removeFriend = function(name) { forumFriends = forumFriends.filter(f => f !== name); safeSet('darkalley_friends', forumFriends); renderForumProfile(); };
 document.getElementById('addFriendBtn').addEventListener('click', () => { const name = safePrompt('输入好友昵称：'); if (name && name.trim() && !forumFriends.includes(name.trim())) { forumFriends.push(name.trim()); safeSet('darkalley_friends', forumFriends); renderForumProfile(); } });
-document.getElementById('sendMessageBtn').addEventListener('click', () => { const to = document.getElementById('messageRecipient').value.trim(); const text = document.getElementById('messageContent').value.trim(); if (!to || !text) return alert('请填写收件人和内容'); forumMessages.push({ from: forumNickname, to, text, time:new Date().toLocaleString('zh-CN') }); safeSet('darkalley_messages', forumMessages); renderForumProfile(); });
+document.getElementById('sendMessageBtn').addEventListener('click', () => { if (!window.currentUser) { alert('请先登录'); openAwakenModal(); return; } const to = document.getElementById('messageRecipient').value.trim(); const text = document.getElementById('messageContent').value.trim(); if (!to || !text) return alert('请填写收件人和内容'); forumMessages.push({ from: currentIdentityName(), to, text, time:new Date().toLocaleString('zh-CN') }); safeSet('darkalley_messages', forumMessages); renderForumProfile(); });
 document.querySelectorAll('.profile-tab').forEach(tab => { tab.addEventListener('click', () => { document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); const t = tab.dataset.tab; ['overview','myposts','checkin','friends','messages'].forEach(k => { const el = document.getElementById(k + 'Panel'); if (el) el.style.display = k === t ? 'block' : 'none'; }); if (t === 'myposts' || t === 'checkin' || t === 'overview') renderForumProfile(); }); });
 const quickCheckinBtn = document.getElementById('quickCheckinBtn');
 if (quickCheckinBtn) quickCheckinBtn.addEventListener('click', () => { doCheckin(); renderForumProfile(); });
@@ -880,25 +884,158 @@ function updatePortalStatus() {
     }
 }
 
+// ============ 👤 统一账号系统（邀请码注册 / 身份绑定） ============
+const INVITE_CODE = 'HX-2026';
+const STAFF_OPTIONS = {
+    'L-09-01-S': '苏晚眠', 'L-09-02-C': '沈绛离', 'L-09-03-X': '谢逢虚', 'L-09-04-W': '温泣语', 'L-09-05-L': '陆烬弦'
+};
+function getUsers() { return safeGetJSON('darkalley_users', {}); }
+function saveUsers(u) { safeSet('darkalley_users', u); }
+function getSessionUser() { return localStorage.getItem('darkalley_session'); }
+function setSessionUser(u) { if (u) localStorage.setItem('darkalley_session', u); else localStorage.removeItem('darkalley_session'); }
+
+// 登录：用户名 + 密码（兼容预设账号）
 function attemptLogin() {
-    const id = document.getElementById('staffIdInput').value.trim(); const pass = document.getElementById('passwordInput').value.trim(); const info = VALID_USERS[id];
-    if (!info || info.pass !== pass) { document.getElementById('loginError').textContent = '[!] 验证失败'; return; }
-    window.currentUser = { id, name:info.name, isAdmin:info.isAdmin };
-    userLoginCounts[id] = (userLoginCounts[id] || 0) + 1; safeSet('xuju_logincounts', userLoginCounts);
-    if (!userFavorites[id]) userFavorites[id] = []; if (!userHistory[id]) userHistory[id] = [];
-    document.getElementById('awakenModal').style.display = 'none';
-    showTerminalLoading(() => {
-        document.getElementById('forumContainer').style.display = 'none'; document.getElementById('terminalContainer').style.display = 'block';
-        if(!terminalInited) { setTimeout(initTerminal, 300); }
-        updatePortalStatus(); setupMiniTerminalPlayer();
-    });
+    const username = document.getElementById('loginUsername').value.trim();
+    const pass = document.getElementById('loginPassword').value.trim();
+    const err = document.getElementById('loginError');
+    let info = null;
+    if (VALID_USERS[username] && VALID_USERS[username].pass === pass) {
+        info = { username, name: VALID_USERS[username].name, isAdmin: !!VALID_USERS[username].isAdmin, type: 'staff', staffId: username, avatar: null };
+    }
+    if (!info) {
+        const users = getUsers();
+        const u = users[username];
+        if (u && u.pass === pass) {
+            info = { username, name: u.roleName || STAFF_OPTIONS[u.staffId] || username, isAdmin: false, type: u.type, staffId: u.staffId, avatar: u.avatar };
+        }
+    }
+    if (!info) { err.textContent = '[!] 用户名或密码错误'; return; }
+    doLogin(info);
 }
-function logoutTerminal() { window.currentUser = null; document.getElementById('terminalContainer').style.display = 'none'; document.getElementById('forumContainer').style.display = 'block'; updatePortalStatus(); }
+function doLogin(info) {
+    info.id = info.username; // 兼容旧代码里的 currentUser.id（= 账号名）
+    window.currentUser = info;
+    setSessionUser(info.username);
+    userLoginCounts[info.username] = (userLoginCounts[info.username] || 0) + 1; safeSet('xuju_logincounts', userLoginCounts);
+    if (!userFavorites[info.username]) userFavorites[info.username] = {};
+    if (!userHistory[info.username]) userHistory[info.username] = [];
+    document.getElementById('awakenModal').style.display = 'none';
+    document.getElementById('forumContainer').style.display = 'block';
+    document.getElementById('terminalContainer').style.display = 'none';
+    updateForumIdentityUI();
+    if (typeof renderForumProfile === 'function') renderForumProfile();
+    renderPostList();
+}
+// 注册：邀请码 + 用户名 + 密码 + 身份类型（自创角色 / 扮演员工）
+function registerAccount() {
+    const invite = document.getElementById('regInvite').value.trim();
+    const username = document.getElementById('regUsername').value.trim();
+    const pass = document.getElementById('regPassword').value.trim();
+    const roleType = (document.querySelector('input[name="regRoleType"]:checked') || {}).value || 'custom';
+    const users = getUsers();
+    const err = document.getElementById('registerError');
+    if (invite !== INVITE_CODE) { err.textContent = '[!] 邀请码无效'; return; }
+    if (!username || username.length < 2) { err.textContent = '[!] 用户名至少 2 个字符'; return; }
+    if (!pass || pass.length < 4) { err.textContent = '[!] 密码至少 4 位'; return; }
+    if (users[username] || VALID_USERS[username]) { err.textContent = '[!] 用户名已被占用'; return; }
+    let roleName = username, staffId = null, avatar = null;
+    if (roleType === 'staff') {
+        staffId = document.getElementById('regStaffSelect').value;
+        roleName = STAFF_OPTIONS[staffId];
+    } else {
+        roleName = document.getElementById('regCustomName').value.trim() || username;
+        avatar = document.getElementById('regCustomAvatar').value.trim() || '🙂';
+    }
+    users[username] = { pass, type: roleType, staffId, roleName, avatar, createdAt: Date.now() };
+    saveUsers(users);
+    err.textContent = '';
+    doLogin({ username, name: roleName, isAdmin: false, type: roleType, staffId, avatar });
+}
+// 退出登录（回游客）
+function logoutForum() {
+    window.currentUser = null;
+    setSessionUser(null);
+    document.getElementById('terminalContainer').style.display = 'none';
+    document.getElementById('forumContainer').style.display = 'block';
+    updateForumIdentityUI();
+    if (typeof renderForumProfile === 'function') renderForumProfile();
+    renderPostList();
+}
+// 进入终端（员工视角，保留）
+function enterTerminal() {
+    if (!window.currentUser) { openAwakenModal(); return; }
+    document.getElementById('forumContainer').style.display = 'none';
+    document.getElementById('terminalContainer').style.display = 'block';
+    if (!terminalInited) setTimeout(initTerminal, 300);
+    updatePortalStatus(); setupMiniTerminalPlayer();
+}
+function logoutTerminal() { document.getElementById('terminalContainer').style.display = 'none'; document.getElementById('forumContainer').style.display = 'block'; updatePortalStatus(); }
+// 论坛身份 UI 刷新
+function updateForumIdentityUI() {
+    const elName = document.getElementById('forumUserName');
+    const elSub = document.getElementById('forumUserSub');
+    const elAvatar = document.getElementById('forumUserAvatar');
+    const loginBtn = document.getElementById('forumLoginBtn');
+    const logoutBtn = document.getElementById('forumLogoutBtn');
+    const accLink = document.getElementById('forumAccountLink');
+    if (window.currentUser) {
+        if (elName) elName.textContent = window.currentUser.name;
+        if (elSub) elSub.textContent = window.currentUser.type === 'staff' ? '扮演员工 · ' + (window.currentUser.staffId || '') : '自创角色';
+        if (elAvatar) elAvatar.textContent = window.currentUser.avatar || (window.currentUser.type === 'staff' ? '☽' : '🙂');
+        if (loginBtn) loginBtn.textContent = '◈ 进入终端';
+        if (logoutBtn) logoutBtn.style.display = '';
+        if (accLink) accLink.textContent = window.currentUser.name;
+    } else {
+        if (elName) elName.textContent = '匿名访客';
+        if (elSub) elSub.textContent = '未登录 · 可浏览，不可发言';
+        if (elAvatar) elAvatar.textContent = '☽';
+        if (loginBtn) loginBtn.textContent = '☽ 登录 / 注册';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        if (accLink) accLink.textContent = '登录';
+    }
+}
+// 会话恢复
+function restoreSession() {
+    const username = getSessionUser();
+    if (!username) return;
+    const users = getUsers();
+    const u = users[username];
+    if (u) {
+        doLogin({ username, name: u.roleName || STAFF_OPTIONS[u.staffId] || username, isAdmin: false, type: u.type, staffId: u.staffId, avatar: u.avatar });
+    } else if (VALID_USERS[username]) {
+        doLogin({ username, name: VALID_USERS[username].name, isAdmin: !!VALID_USERS[username].isAdmin, type: 'staff', staffId: username, avatar: null });
+    }
+}
+
+// 绑定事件
 document.getElementById('loginBtn').addEventListener('click', attemptLogin);
-document.getElementById('passwordInput').addEventListener('keypress', e => { if(e.key==='Enter') attemptLogin(); });
+document.getElementById('loginPassword').addEventListener('keypress', e => { if (e.key === 'Enter') attemptLogin(); });
+document.getElementById('registerBtn').addEventListener('click', registerAccount);
 document.getElementById('logoutTopBtn').addEventListener('click', logoutTerminal);
-function openAwakenModal() { document.getElementById('awakenModal').style.display = 'flex'; document.getElementById('staffIdInput').focus(); }
-['awakenEntryBtn','awakenEntryFooter'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('click', e => { e.preventDefault(); openAwakenModal(); }); });
+document.querySelectorAll('.login-tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.login-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.getElementById('loginForm').style.display = tab.dataset.tab === 'login' ? 'block' : 'none';
+    document.getElementById('registerForm').style.display = tab.dataset.tab === 'register' ? 'block' : 'none';
+}));
+document.querySelectorAll('input[name="regRoleType"]').forEach(r => r.addEventListener('change', () => {
+    const staff = (document.querySelector('input[name="regRoleType"]:checked') || {}).value === 'staff';
+    const sw = document.getElementById('regStaffWrap'), cw = document.getElementById('regCustomWrap');
+    if (sw) sw.style.display = staff ? 'block' : 'none';
+    if (cw) cw.style.display = staff ? 'none' : 'block';
+}));
+function openAwakenModal() {
+    document.getElementById('awakenModal').style.display = 'flex';
+    const lu = document.getElementById('loginUsername'); if (lu) lu.focus();
+}
+// 「那扇门」：未登录 → 登录框；已登录 → 进终端
+['awakenEntryBtn', 'awakenEntryFooter'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('click', e => { e.preventDefault(); if (window.currentUser) enterTerminal(); else openAwakenModal(); }); });
+const forumAccountLink = document.getElementById('forumAccountLink');
+if (forumAccountLink) forumAccountLink.addEventListener('click', e => { e.preventDefault(); if (window.currentUser) enterTerminal(); else openAwakenModal(); });
+const forumLoginBtnEl = document.getElementById('forumLoginBtn');
+if (forumLoginBtnEl) forumLoginBtnEl.addEventListener('click', () => { if (window.currentUser) enterTerminal(); else openAwakenModal(); });
+const forumLogoutBtnEl = document.getElementById('forumLogoutBtn');
+if (forumLogoutBtnEl) forumLogoutBtnEl.addEventListener('click', logoutForum);
 document.getElementById('closeAwakenModalBtn').addEventListener('click', () => document.getElementById('awakenModal').style.display = 'none');
 
 function showTerminalLoading(callback) {
@@ -2373,6 +2510,8 @@ function initFog() {
 
 // ============ 初始化 ============
 try {
+    restoreSession();
+    updateForumIdentityUI();
     initFog();
     bindGameView();
     bindFolkEntries();

@@ -44,6 +44,7 @@
                 <a href="#" class="nav-link active" id="forumHomeLink">首页</a>
                 <a href="#" class="nav-link" id="forumNewPostLink">发帖</a>
                 <a href="#" class="nav-link" id="forumProfileLink">我的</a>
+                <a href="#" class="nav-link" id="forumAccountLink" title="登录 / 注册">登录</a>
             </nav>
         </header>
 
@@ -107,8 +108,11 @@
         <div class="forum-body">
             <aside class="forum-sidebar">
                 <div class="sidebar-box forum-user-card">
-                    <div class="forum-user-avatar"><span>☽</span></div>
-                    <div class="forum-user-name">匿名访客</div>
+                    <div class="forum-user-avatar"><span id="forumUserAvatar">☽</span></div>
+                    <div class="forum-user-name" id="forumUserName">匿名访客</div>
+                    <div class="forum-user-sub" id="forumUserSub">未登录 · 可浏览，不可发言</div>
+                    <button id="forumLoginBtn" class="forum-login-btn" type="button">☽ 登录 / 注册</button>
+                    <button id="forumLogoutBtn" class="forum-logout-btn" type="button" style="display:none;">退出</button>
                     <div class="forum-user-stats">
                         <span><b id="totalPosts">0</b>帖子</span>
                         <span><b>∞</b>用户</span>
@@ -243,28 +247,75 @@
         </footer>
     </div>
 
-    <!-- 登录弹窗 -->
+    <!-- 账号弹窗：登录 / 注册 -->
     <div class="modal-overlay" id="awakenModal" style="display:none;">
         <div class="modal-box awaken-login-box">
             <button class="modal-close" id="closeAwakenModalBtn">✕</button>
-            <div class="login-header"><div class="logo-icon">⚠️</div><div class="logo-text">全域墟化现象管控总局</div></div>
-            <div class="login-warning">仅限司级以上人员登录</div>
-            <div class="login-form">
+            <div class="login-header"><div class="logo-icon">☽</div><div class="logo-text">暗巷 · 巷口</div></div>
+            <div class="login-tabs">
+                <button class="login-tab active" data-tab="login" type="button">登 录</button>
+                <button class="login-tab" data-tab="register" type="button">注 册</button>
+            </div>
+            <!-- 登录 -->
+            <div class="login-form" id="loginForm">
                 <div class="form-group">
-                    <label class="input-label">员工编号</label>
-                    <input type="text" id="staffIdInput" placeholder="编号">
+                    <label class="input-label">用户名</label>
+                    <input type="text" id="loginUsername" placeholder="用户名">
                 </div>
                 <div class="form-group">
-                    <label class="input-label">验证口令</label>
+                    <label class="input-label">密码</label>
                     <div class="password-wrap">
-                        <input type="password" id="passwordInput" placeholder="口令" autocomplete="off">
-                        <button type="button" id="pwdToggleBtn" class="pwd-toggle" title="显示/隐藏口令">👁</button>
+                        <input type="password" id="loginPassword" placeholder="密码" autocomplete="off">
+                        <button type="button" id="pwdToggleBtn" class="pwd-toggle" title="显示/隐藏">👁</button>
                     </div>
                 </div>
-                <button id="loginBtn">◈ 连接终端 ◈</button>
-                <div class="login-hint">访客：QYXH-GUEST / visitor<br>管理员：ADMIN-001 / admin123</div>
+                <button id="loginBtn">◈ 登 录 ◈</button>
                 <div id="loginError" class="error-msg"></div>
             </div>
+            <!-- 注册 -->
+            <div class="login-form" id="registerForm" style="display:none;">
+                <div class="form-group">
+                    <label class="input-label">邀请码</label>
+                    <input type="text" id="regInvite" placeholder="邀请码">
+                </div>
+                <div class="form-group">
+                    <label class="input-label">用户名</label>
+                    <input type="text" id="regUsername" placeholder="用户名">
+                </div>
+                <div class="form-group">
+                    <label class="input-label">密码</label>
+                    <div class="password-wrap">
+                        <input type="password" id="regPassword" placeholder="密码" autocomplete="off">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="input-label">身份类型</label>
+                    <div class="reg-roletype">
+                        <label class="reg-role-opt"><input type="radio" name="regRoleType" value="custom" checked> 自创角色</label>
+                        <label class="reg-role-opt"><input type="radio" name="regRoleType" value="staff"> 扮演员工</label>
+                    </div>
+                </div>
+                <div class="form-group" id="regCustomWrap">
+                    <label class="input-label">角色名</label>
+                    <input type="text" id="regCustomName" placeholder="你的角色名">
+                    <label class="input-label">头像（可选，emoji）</label>
+                    <input type="text" id="regCustomAvatar" placeholder="🙂">
+                </div>
+                <div class="form-group" id="regStaffWrap" style="display:none;">
+                    <label class="input-label">扮演员工</label>
+                    <select id="regStaffSelect">
+                        <option value="L-09-01-S">苏晚眠</option>
+                        <option value="L-09-02-C">沈绛离</option>
+                        <option value="L-09-03-X">谢逢虚</option>
+                        <option value="L-09-04-W">温泣语</option>
+                        <option value="L-09-05-L">陆烬弦</option>
+                    </select>
+                    <div class="login-hint">以员工身份发言会显示角色名；管理员不开放注册</div>
+                </div>
+                <button id="registerBtn">◈ 注 册 ◈</button>
+                <div id="registerError" class="error-msg"></div>
+            </div>
+            <div class="login-hint">游客可浏览，发帖 / 回帖需登录</div>
         </div>
     </div>
 
