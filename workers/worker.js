@@ -1,8 +1,8 @@
 // ============================================================
-//  暗巷 · 账号服务 Worker（Cloudflare Workers + KV）
+//  暗巷 · 账号服务 Worker（Cloudflare Workers + D1 SQLite）
 //  部署：Cloudflare Dashboard → Workers → 创建 Worker →
-//        粘贴本文件全部代码 → 绑定 KV namespace（变量名 HUAXU_KV）→ 部署
-//  绑定名必须是 HUAXU_KV（对应你创建的 KV namespace 5b2abdd4...）
+//        粘贴本文件全部代码 → 绑定 D1 数据库（变量名 HUAXU_DB）→ 部署
+//  首次请求会自动建表（users / sessions），无需手动执行 SQL
 // ============================================================
 
 // ---------- 配置（部署后可自行修改） ----------
@@ -20,8 +20,17 @@ const STAFF_OPTIONS = {
   'L-09-05-L': '陆烬弦'
 };
 
-const USER_PREFIX = 'user:';
-const SESSION_PREFIX = 'token:';
+// D1 建表（首次请求自动执行，无需手动跑 SQL）
+async function ensureTables(env) {
+  await env.HUAXU_DB.prepare(`CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, salt TEXT NOT NULL,
+    type TEXT NOT NULL, staff_id TEXT, role_name TEXT NOT NULL, avatar TEXT,
+    is_admin INTEGER DEFAULT 0, created_at INTEGER NOT NULL
+  )`).run();
+  await env.HUAXU_DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY, username TEXT NOT NULL, expires INTEGER NOT NULL
+  )`).run();
+}
 
 // ---------- CORS（前端在 Cloudflare Pages / GitHub Pages / 本地 file 都允许） ----------
 const CORS_HEADERS = {
@@ -40,6 +49,7 @@ export default {
     const path = url.pathname;
 
     try {
+      await ensureTables(env); // 首次请求自动建表
       if (path === '/api/register' && request.method === 'POST') return await handleRegister(request, env);
       if (path === '/api/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
@@ -87,10 +97,9 @@ async function hashPassword(pass, saltHex) {
 // 创建会话 token（存 KV，带过期）
 async function createSession(env, username) {
   const token = randomHex(32);
-  await env.HUAXU_KV.put(SESSION_PREFIX + token, JSON.stringify({
-    username,
-    expires: Date.now() + TOKEN_TTL_MS
-  }), { expirationTtl: Math.ceil(TOKEN_TTL_MS / 1000) });
+  const expires = Date.now() + TOKEN_TTL_MS;
+  await env.HUAXU_DB.prepare('INSERT INTO sessions (token, username, expires) VALUES (?,?,?)')
+    .bind(token, username, expires).run();
   return token;
 }
 
@@ -117,11 +126,10 @@ function getToken(request, url) {
 async function readSession(request, env, url) {
   const token = getToken(request, url);
   if (!token) return null;
-  const raw = await env.HUAXU_KV.get(SESSION_PREFIX + token);
-  if (!raw) return null;
-  const sess = JSON.parse(raw);
+  const sess = await env.HUAXU_DB.prepare('SELECT * FROM sessions WHERE token = ?').bind(token).first();
+  if (!sess) return null;
   if (Date.now() > sess.expires) {
-    await env.HUAXU_KV.delete(SESSION_PREFIX + token);
+    await env.HUAXU_DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
     return null;
   }
   return { token, sess };
@@ -138,7 +146,7 @@ async function handleRegister(request, env) {
   if (!pwd || pwd.length < 4) return json({ error: '[!] 密码至少 4 位' }, 400);
   if (uname === ADMIN_USERNAME) return json({ error: '[!] 用户名已被占用' }, 409);
 
-  const existing = await env.HUAXU_KV.get(USER_PREFIX + uname);
+  const existing = await env.HUAXU_DB.prepare('SELECT username FROM users WHERE username = ?').bind(uname).first();
   if (existing) return json({ error: '[!] 用户名已被占用' }, 409);
 
   const roleType = body.roleType === 'staff' ? 'staff' : 'custom';
@@ -154,12 +162,11 @@ async function handleRegister(request, env) {
 
   const salt = randomHex(16);
   const passHash = await hashPassword(pwd, salt);
-  const user = {
-    username: uname, passHash, salt,
-    type: roleType, staffId, roleName, avatar,
-    isAdmin: false, createdAt: Date.now()
-  };
-  await env.HUAXU_KV.put(USER_PREFIX + uname, JSON.stringify(user));
+  const createdAt = Date.now();
+  await env.HUAXU_DB.prepare(
+    'INSERT INTO users (username, pass_hash, salt, type, staff_id, role_name, avatar, is_admin, created_at) VALUES (?,?,?,?,?,?,?,0,?)'
+  ).bind(uname, passHash, salt, roleType, staffId, roleName, avatar, createdAt).run();
+  const user = { username: uname, type: roleType, staffId, roleName, avatar, isAdmin: false, createdAt };
 
   // 注册即登录：发 token
   const token = await createSession(env, uname);
@@ -175,29 +182,27 @@ async function handleLogin(request, env) {
 
   let user = null;
 
-  // 管理员首次登录自动播种（KV 里没有 HUAXU 时）
+  // 管理员首次登录自动播种（users 表里没有 HUAXU 时）
   if (uname === ADMIN_USERNAME) {
-    const existing = await env.HUAXU_KV.get(USER_PREFIX + uname);
+    const existing = await env.HUAXU_DB.prepare('SELECT username FROM users WHERE username = ?').bind(uname).first();
     if (!existing) {
       if (pwd !== ADMIN_PASSWORD) return json({ error: '[!] 用户名或密码错误' }, 401);
       const salt = randomHex(16);
       const passHash = await hashPassword(pwd, salt);
-      user = {
-        username: uname, passHash, salt,
-        type: 'staff', staffId: uname, roleName: '系统管理员', avatar: null,
-        isAdmin: true, createdAt: Date.now()
-      };
-      await env.HUAXU_KV.put(USER_PREFIX + uname, JSON.stringify(user));
+      const createdAt = Date.now();
+      await env.HUAXU_DB.prepare(
+        'INSERT INTO users (username, pass_hash, salt, type, staff_id, role_name, avatar, is_admin, created_at) VALUES (?,?,?,?,?,?,?,1,?)'
+      ).bind(uname, passHash, salt, 'staff', uname, '系统管理员', null, createdAt).run();
+      user = { username: uname, type: 'staff', staffId: uname, roleName: '系统管理员', avatar: null, isAdmin: true, createdAt };
     }
   }
 
   if (!user) {
-    const raw = await env.HUAXU_KV.get(USER_PREFIX + uname);
-    if (!raw) return json({ error: '[!] 用户名或密码错误' }, 401);
-    const u = JSON.parse(raw);
+    const u = await env.HUAXU_DB.prepare('SELECT * FROM users WHERE username = ?').bind(uname).first();
+    if (!u) return json({ error: '[!] 用户名或密码错误' }, 401);
     const hash = await hashPassword(pwd, u.salt);
-    if (hash !== u.passHash) return json({ error: '[!] 用户名或密码错误' }, 401);
-    user = u;
+    if (hash !== u.pass_hash) return json({ error: '[!] 用户名或密码错误' }, 401);
+    user = { username: u.username, type: u.type, staffId: u.staff_id, roleName: u.role_name, avatar: u.avatar, isAdmin: !!u.is_admin, createdAt: u.created_at };
   }
 
   const token = await createSession(env, uname);
@@ -209,15 +214,15 @@ async function handleMe(request, env) {
   const url = new URL(request.url);
   const sess = await readSession(request, env, url);
   if (!sess) return json({ error: '未登录或会话已过期' }, 401);
-  const raw = await env.HUAXU_KV.get(USER_PREFIX + sess.sess.username);
-  if (!raw) return json({ error: '用户不存在' }, 401);
-  return json({ ok: true, user: publicUser(JSON.parse(raw)) });
+  const u = await env.HUAXU_DB.prepare('SELECT * FROM users WHERE username = ?').bind(sess.sess.username).first();
+  if (!u) return json({ error: '用户不存在' }, 401);
+  return json({ ok: true, user: publicUser({ username: u.username, type: u.type, staffId: u.staff_id, roleName: u.role_name, avatar: u.avatar, isAdmin: !!u.is_admin, createdAt: u.created_at }) });
 }
 
 // ---------- 退出 ----------
 async function handleLogout(request, env) {
   const url = new URL(request.url);
   const sess = await readSession(request, env, url);
-  if (sess) await env.HUAXU_KV.delete(SESSION_PREFIX + sess.token);
+  if (sess) await env.HUAXU_DB.prepare('DELETE FROM sessions WHERE token = ?').bind(sess.token).run();
   return json({ ok: true });
 }

@@ -1,5 +1,10 @@
-name = "huaxu-account"  # 改成你的项目名
+name = "huaxu-account"
+main = "workers/worker.js"
+compatibility_date = "2026-08-16"
 
-[[kv_namespaces]]
-binding = "USER_DB"
-id = "5b2abdd47a9f48f098f6da8942c4eb2d"
+# ⚠️ binding 必须叫 HUAXU_DB（与 worker.js 里的 env.HUAXU_DB 一致）
+# database_id 在创建 D1 数据库后才有，用 wrangler d1 info 或 Dashboard 里查看
+[[d1_databases]]
+binding = "HUAXU_DB"
+database_name = "huaxu-db"
+database_id = "你的数据库ID"
