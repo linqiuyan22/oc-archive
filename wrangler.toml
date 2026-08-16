@@ -1,0 +1,5 @@
+name = "huaxu-account"  # 改成你的项目名
+
+[[kv_namespaces]]
+binding = "USER_DB"
+id = "5b2abdd47a9f48f098f6da8942c4eb2d"
