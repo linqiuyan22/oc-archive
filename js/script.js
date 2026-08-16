@@ -884,6 +884,34 @@ function updatePortalStatus() {
     }
 }
 
+// ============ ☁️ 云端账号（Cloudflare Worker + KV） ============
+// 部署 Worker 后把域名填进这里（如 'https://huaxu-account.你的子域.workers.dev'）；留空 = 纯本地模式
+// 也可不改代码：运行后执行 localStorage.setItem('darkalley_cloud_api', '你的worker域名') 再刷新（优先级更高）
+const CLOUD_API_BASE_DEFAULT = '';
+const CLOUD_TOKEN_KEY = 'darkalley_cloud_token';
+function cloudApiBase() { return (localStorage.getItem('darkalley_cloud_api') || CLOUD_API_BASE_DEFAULT).replace(/\/+$/, ''); }
+function cloudToken() { return localStorage.getItem(CLOUD_TOKEN_KEY); }
+function setCloudToken(t) { if (t) localStorage.setItem(CLOUD_TOKEN_KEY, t); else localStorage.removeItem(CLOUD_TOKEN_KEY); }
+async function cloudRequest(path, body) {
+    const headers = {};
+    if (body) headers['Content-Type'] = 'application/json';
+    const tok = cloudToken();
+    if (tok) headers['Authorization'] = 'Bearer ' + tok;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    try {
+        const res = await fetch(cloudApiBase() + path, {
+            method: body ? 'POST' : 'GET',
+            headers, body: body ? JSON.stringify(body) : undefined,
+            signal: ctrl.signal
+        });
+        const data = await res.json().catch(() => ({ error: '响应解析失败' }));
+        return { ok: res.ok, status: res.status, data };
+    } catch (e) {
+        return { ok: false, status: 0, data: { error: '网络错误' } }; // status 0 = 连不上云端，交给本地兜底
+    } finally { clearTimeout(timer); }
+}
+
 // ============ 👤 统一账号系统（邀请码注册 / 身份绑定） ============
 const INVITE_CODE = 'HX-2026';
 const STAFF_OPTIONS = {
@@ -894,11 +922,25 @@ function saveUsers(u) { safeSet('darkalley_users', u); }
 function getSessionUser() { return localStorage.getItem('darkalley_session'); }
 function setSessionUser(u) { if (u) localStorage.setItem('darkalley_session', u); else localStorage.removeItem('darkalley_session'); }
 
-// 登录：用户名 + 密码（兼容预设账号）
-function attemptLogin() {
+// 登录：用户名 + 密码（云端优先，本地兜底）
+async function attemptLogin() {
     const username = document.getElementById('loginUsername').value.trim();
     const pass = document.getElementById('loginPassword').value.trim();
     const err = document.getElementById('loginError');
+    err.textContent = '';
+    // —— 云端优先 ——
+    if (cloudApiBase()) {
+        const r = await cloudRequest('/api/login', { username, pass });
+        if (r.ok) {
+            setCloudToken(r.data.token);
+            doLogin({ username: r.data.user.username, name: r.data.user.roleName, isAdmin: !!r.data.user.isAdmin, type: r.data.user.type, staffId: r.data.user.staffId, avatar: r.data.user.avatar });
+            return;
+        }
+        if (r.status === 401) { err.textContent = r.data.error || '[!] 用户名或密码错误'; return; }
+        if (r.status !== 0) { err.textContent = r.data.error || '[!] 登录失败'; return; }
+        // status 0 = 云端连不上 → 落到本地兜底
+    }
+    // —— 本地兜底 ——
     let info = null;
     if (VALID_USERS[username] && VALID_USERS[username].pass === pass) {
         info = { username, name: VALID_USERS[username].name, isAdmin: !!VALID_USERS[username].isAdmin, type: 'staff', staffId: username, avatar: null };
@@ -927,18 +969,18 @@ function doLogin(info) {
     if (typeof renderForumProfile === 'function') renderForumProfile();
     renderPostList();
 }
-// 注册：邀请码 + 用户名 + 密码 + 身份类型（自创角色 / 扮演员工）
-function registerAccount() {
+// 注册：邀请码 + 用户名 + 密码 + 身份类型（自创角色 / 扮演员工）——云端优先，本地兜底
+async function registerAccount() {
     const invite = document.getElementById('regInvite').value.trim();
     const username = document.getElementById('regUsername').value.trim();
     const pass = document.getElementById('regPassword').value.trim();
     const roleType = (document.querySelector('input[name="regRoleType"]:checked') || {}).value || 'custom';
-    const users = getUsers();
     const err = document.getElementById('registerError');
+    err.textContent = '';
+    // 基础校验（本地快速反馈，云端也会再校验）
     if (invite !== INVITE_CODE) { err.textContent = '[!] 邀请码无效'; return; }
     if (!username || username.length < 2) { err.textContent = '[!] 用户名至少 2 个字符'; return; }
     if (!pass || pass.length < 4) { err.textContent = '[!] 密码至少 4 位'; return; }
-    if (users[username] || VALID_USERS[username]) { err.textContent = '[!] 用户名已被占用'; return; }
     let roleName = username, staffId = null, avatar = null;
     if (roleType === 'staff') {
         staffId = document.getElementById('regStaffSelect').value;
@@ -947,6 +989,20 @@ function registerAccount() {
         roleName = document.getElementById('regCustomName').value.trim() || username;
         avatar = document.getElementById('regCustomAvatar').value.trim() || '🙂';
     }
+    // —— 云端优先 ——
+    if (cloudApiBase()) {
+        const r = await cloudRequest('/api/register', { invite, username, pass, roleType, staffId, roleName, avatar });
+        if (r.ok) {
+            setCloudToken(r.data.token);
+            doLogin({ username: r.data.user.username, name: r.data.user.roleName, isAdmin: !!r.data.user.isAdmin, type: r.data.user.type, staffId: r.data.user.staffId, avatar: r.data.user.avatar });
+            return;
+        }
+        if (r.status !== 0) { err.textContent = r.data.error || '[!] 注册失败'; return; }
+        // status 0 = 云端连不上 → 落到本地兜底
+    }
+    // —— 本地兜底 ——
+    const users = getUsers();
+    if (users[username] || VALID_USERS[username]) { err.textContent = '[!] 用户名已被占用'; return; }
     users[username] = { pass, type: roleType, staffId, roleName, avatar, createdAt: Date.now() };
     saveUsers(users);
     err.textContent = '';
@@ -954,8 +1010,11 @@ function registerAccount() {
 }
 // 退出登录（回游客）
 function logoutForum() {
+    const tok = cloudToken();
     window.currentUser = null;
     setSessionUser(null);
+    setCloudToken(null);
+    if (cloudApiBase() && tok) { try { fetch(cloudApiBase() + '/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + tok } }).catch(() => {}); } catch (e) {} }
     document.getElementById('terminalContainer').style.display = 'none';
     document.getElementById('forumContainer').style.display = 'block';
     updateForumIdentityUI();
@@ -995,8 +1054,20 @@ function updateForumIdentityUI() {
         if (accLink) accLink.textContent = '登录';
     }
 }
-// 会话恢复
-function restoreSession() {
+// 会话恢复（云端优先，本地兜底）
+async function restoreSession() {
+    // —— 云端优先：有 token 先验证 ——
+    if (cloudApiBase() && cloudToken()) {
+        const r = await cloudRequest('/api/me');
+        if (r.ok) {
+            const u = r.data.user;
+            doLogin({ username: u.username, name: u.roleName, isAdmin: !!u.isAdmin, type: u.type, staffId: u.staffId, avatar: u.avatar });
+            return;
+        }
+        if (r.status === 401) setCloudToken(null); // 会话过期，清掉 token
+        // status 0 = 云端连不上 → 回退本地
+    }
+    // —— 本地兜底 ——
     const username = getSessionUser();
     if (!username) return;
     const users = getUsers();
